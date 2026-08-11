@@ -1,0 +1,76 @@
+name: Build Browser Demo
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-browser-demo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch verified Godot 4.7.1 Web runtime
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf web runtime
+          mkdir -p web runtime
+          BASE='https://raw.githubusercontent.com/TVGSDVLGames/Creature-Simulator/main/web'
+          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do
+            curl -L --fail --retry 3 "$BASE/$f" -o "web/$f"
+          done
+          test -s web/index.wasm
+          test -s web/index.js
+
+      - name: Fetch Balls Out game payload
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 'https://files.catbox.moe/ctict7.zip' -o balls-windows.zip
+          mkdir payload
+          unzip -q balls-windows.zip -d payload
+          PCK="$(find payload -type f -iname '*.pck' | head -1)"
+          test -n "$PCK"
+          test -s "$PCK"
+          cp "$PCK" web/index.pck
+          echo "Using game pack: $PCK ($(stat -c%s web/index.pck) bytes)"
+
+      - name: Patch loader metadata for Balls Out
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('web/index.html')
+          s = html.read_text()
+          size = Path('web/index.pck').stat().st_size
+          s2, n = re.subn(r'("index\.pck"\s*:\s*)\d+', rf'\g<1>{size}', s)
+          if n == 0:
+              print('No embedded PCK size field found; loader does not require patching.')
+          else:
+              html.write_text(s2)
+              print('Patched PCK size to', size)
+          PY
+          test -s web/index.html
+          ls -lh web
+
+      - name: Commit browser build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name 'TVGSDVLGames'
+          git config user.email 'TVGSDVLGames@users.noreply.github.com'
+          git add -f web
+          if git diff --cached --quiet; then
+            echo 'Browser build already current.'
+          else
+            git commit -m 'Add browser-playable Balls Out demo'
+            git push
+          fi
