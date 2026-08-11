@@ -1,3 +1,11 @@
+# ▶ Play Balls Out in Your Browser
+
+## **[LAUNCH THE PLAYABLE BUILD →](https://balls-out-play-tvhsdvlgames.vercel.app/)**
+
+**No download or installation required.** Browser portfolio demo with controller support; the repository below tracks the current P51 Godot project.
+
+---
+
 # Balls Out
 
 Controller-first 3D arcade/action prototype built in **Godot 4.7.1**. The player defends a barricade by physically throwing elemental bowling balls into advancing crowds, with quick throws, crowd-control effects, difficulty modes, two-player support, event cameras, and a performance-conscious presentation layer.
