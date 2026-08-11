@@ -1,0 +1,104 @@
+name: Build browser version
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Reconstruct web source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p project
+          cat .web-source/source.part*.b64 | base64 -d > /tmp/source.tar.xz
+          tar -xJf /tmp/source.tar.xz -C project
+
+      - name: Rebuild authored PBR materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pillow numpy scipy
+          (cd project && python tools/generate_pbr_textures.py)
+
+      - name: Download Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          GODOT_BIN=$(find /tmp/godot -maxdepth 1 -type f -name 'Godot*linux*x86_64' | head -1)
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+
+      - name: Install Godot Web export template
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          unzip -j /tmp/templates.tpz 'templates/web_nothreads_release.zip' -d "$TEMPLATE_DIR"
+          printf '4.7.1.stable\n' > "$TEMPLATE_DIR/version.txt"
+
+      - name: Configure Web export
+        shell: bash
+        run: |
+          cat > project/export_presets.cfg <<'EOF'
+          [preset.0]
+          name="Web"
+          platform="Web"
+          runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="../web/index.html"
+          script_export_mode=2
+
+          [preset.0.options]
+          custom_template/debug=""
+          custom_template/release=""
+          variant/extensions_support=false
+          variant/thread_support=false
+          vram_texture_compression/for_desktop=true
+          vram_texture_compression/for_mobile=false
+          html/export_icon=true
+          html/custom_html_shell=""
+          html/head_include=""
+          html/canvas_resize_policy=2
+          html/focus_canvas_on_start=true
+          progressive_web_app/enabled=false
+          EOF
+
+      - name: Import and export browser build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf web
+          mkdir -p web
+          "$GODOT_BIN" --headless --path project --import
+          "$GODOT_BIN" --headless --path project --export-release Web "$GITHUB_WORKSPACE/web/index.html"
+          test -s web/index.html
+
+      - name: Publish browser files to repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -f web
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Build browser-playable version"
+          git push origin HEAD:main
