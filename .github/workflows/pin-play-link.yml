@@ -1,0 +1,35 @@
+name: Pin Play Link
+
+on:
+  push:
+    paths:
+      - '.github/workflows/pin-play-link.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put browser launch at top of README
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('README.md')
+          old = p.read_text()
+          marker = 'https://balls-out-play-tvhsdvlgames.vercel.app/'
+          if marker not in old:
+              block = '''# ▶ Play Balls Out in Your Browser\n\n## **[LAUNCH THE PLAYABLE BUILD →](https://balls-out-play-tvhsdvlgames.vercel.app/)**\n\n**No download or installation required.** Browser portfolio demo with controller support; the repository below tracks the current P51 Godot project.\n\n---\n\n'''
+              p.write_text(block + old)
+          PY
+          git config user.name 'TVGSDVLGames'
+          git config user.email 'TVGSDVLGames@users.noreply.github.com'
+          git add README.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Put playable browser build at top of README'
+            git push
+          fi
