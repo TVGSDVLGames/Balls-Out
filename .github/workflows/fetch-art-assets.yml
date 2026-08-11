@@ -13,9 +13,9 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libglu1-mesa libxcursor1 libxinerama1 libxi6 libxrandr2 libxrender1
 
-      - name: Fetch real GitHub/Godot assets
+      - name: Fetch real GitHub/Godot model and Material Maker
         shell: bash
         run: |
           set -euxo pipefail
@@ -27,41 +27,49 @@ jobs:
             -o art-assets/models/mannequiny.LICENSE.md \
             https://raw.githubusercontent.com/godotengine/godot-demo-projects/6ad6167e0577fe3622c18546138f456b107ce93c/3d/ragdoll_physics/characters/mannequiny.LICENSE.md
           curl -L --fail --retry 3 \
-            -o art-assets/tools/material_maker_1_7_linux.tar.gz \
-            https://github.com/RodZill4/material-maker/releases/download/1.7/material_maker_1_7_linux.tar.gz
+            -o art-assets/tools/material_maker_1_3_linux.tar.gz \
+            https://github.com/RodZill4/material-maker/releases/download/1.3/material_maker_1_3_linux.tar.gz
 
       - name: Export real Material Maker PBR materials at 2048
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p mm
-          tar -xzf art-assets/tools/material_maker_1_7_linux.tar.gz -C mm
-          MM_DIR="$GITHUB_WORKSPACE/mm/material_maker_1_7_linux"
-          chmod +x "$MM_DIR/material_maker.x86_64"
+          tar -xzf art-assets/tools/material_maker_1_3_linux.tar.gz -C mm
+          MM_BIN=$(find "$GITHUB_WORKSPACE/mm" -type f \( -name 'material_maker.x86_64' -o -name 'material_maker' \) | head -n 1)
+          test -n "$MM_BIN"
+          chmod +x "$MM_BIN"
+          MM_DIR=$(dirname "$MM_BIN")
           cd "$MM_DIR"
+          echo "Using actual Material Maker binary: $MM_BIN"
+          ls examples/improved_brick.ptex examples/stone_wall.ptex examples/rusted_metal.ptex examples/wooden_floor.ptex examples/floor1.ptex
           GODOT_SILENCE_ROOT_WARNING=1 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
-            ./material_maker.x86_64 \
+            "$MM_BIN" \
             --audio-driver Dummy \
-            --rendering-driver opengl3 \
+            --video-driver GLES3 \
             --export-material \
-            --target "Godot/Godot 4 Standard" \
-            --output-dir "$GITHUB_WORKSPACE/art-assets/materials" \
+            --target Godot \
+            -o "$GITHUB_WORKSPACE/art-assets/materials" \
             examples/improved_brick.ptex \
             examples/stone_wall.ptex \
             examples/rusted_metal.ptex \
             examples/wooden_floor.ptex \
             examples/floor1.ptex
+          echo '--- EXPORTED MATERIAL MAKER FILES ---'
+          find "$GITHUB_WORKSPACE/art-assets/materials" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort
+          test "$(find "$GITHUB_WORKSPACE/art-assets/materials" -type f | wc -l)" -gt 5
 
       - name: Record hashes and provenance
         shell: bash
         run: |
-          sha256sum art-assets/models/mannequiny.glb art-assets/tools/material_maker_1_7_linux.tar.gz > art-assets/SHA256SUMS.txt
+          sha256sum art-assets/models/mannequiny.glb art-assets/tools/material_maker_1_3_linux.tar.gz > art-assets/SHA256SUMS.txt
           cat > art-assets/PROVENANCE.txt <<'EOF'
           mannequiny.glb: godotengine/godot-demo-projects, Ragdoll Physics demo, GDQuest model, CC BY 4.0
-          Material Maker: RodZill4/material-maker 1.7, actual Linux release executable
-          Generated material sources: Material Maker 1.7 bundled example .ptex graphs
-          Export target: Godot/Godot 4 Standard
-          Export resolution: Material Maker command-line default 2048x2048
+          Material Maker: RodZill4/material-maker 1.3, actual Linux release executable (Godot 3.5.2 build)
+          Generated material sources: Material Maker bundled example .ptex graphs
+          Export target: Godot
+          Requested output size: Material Maker material defaults (2048 where graph output uses default resolution)
+          Material Maker 1.7 was attempted first but crashed under software-rendered CI; no output from that failed run is being claimed or used.
           EOF
 
       - name: Upload real asset bridge artifact
