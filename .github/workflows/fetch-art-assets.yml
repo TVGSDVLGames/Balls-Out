@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p art-assets/models/godot-demo art-assets/models/cat-template art-assets/tools art-assets/materials
+          mkdir -p art-assets/models/godot-demo art-assets/models/cat-template art-assets/animations art-assets/tools art-assets/materials
           curl -L --fail --retry 3 -o art-assets/models/godot-demo/mannequiny.glb \
             https://raw.githubusercontent.com/godotengine/godot-demo-projects/6ad6167e0577fe3622c18546138f456b107ce93c/3d/ragdoll_physics/characters/mannequiny.glb
           curl -L --fail --retry 3 -o art-assets/models/godot-demo/mannequiny.LICENSE.md \
@@ -34,8 +34,8 @@ jobs:
           curl -L --fail --retry 3 -o art-assets/models/cat-template/feminine_normals.png "$CAT/assets/characters/feminine_normals.png"
           curl -L --fail --retry 3 -o art-assets/models/cat-template/haircard_albedo.png "$CAT/assets/characters/haircard_albedo.png"
           curl -L --fail --retry 3 -o art-assets/models/cat-template/hair_normals.png "$CAT/assets/characters/hair_normals.png"
-          curl -L --fail --retry 3 -o art-assets/models/cat-template/LICENSE \
-            https://raw.githubusercontent.com/catprisbrey/Cats-Godot4-Modular-Souls-like-Template/d8bceffc5bf4afe585a3a926fd9aa60ebd26e001/LICENSE
+          curl -L --fail --retry 3 -o art-assets/models/cat-template/LICENSE "$CAT/LICENSE"
+          curl -L --fail --retry 3 -o art-assets/animations/MeleeLib.res "$CAT/player/animation_libraries/MeleeLib.res"
 
       - name: Fetch real Material Maker 1.3
         shell: bash
@@ -45,7 +45,6 @@ jobs:
             https://github.com/RodZill4/material-maker/releases/download/1.3/material_maker_1_3_linux.tar.gz
 
       - name: Export real Material Maker PBR materials
-        continue-on-error: true
         shell: bash
         run: |
           set -euxo pipefail
@@ -57,12 +56,13 @@ jobs:
           MM_DIR=$(dirname "$MM_BIN")
           cd "$MM_DIR"
           echo "Using actual Material Maker binary: $MM_BIN"
-          find examples -maxdepth 1 -name '*.ptex' | head -30
           GODOT_SILENCE_ROOT_WARNING=1 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
             "$MM_BIN" --audio-driver Dummy --video-driver GLES3 \
-            --export-material --target Godot -o "$GITHUB_WORKSPACE/art-assets/materials" \
+            --export-material --target "Godot/Godot 4 Standard" -o "$GITHUB_WORKSPACE/art-assets/materials" \
             examples/improved_brick.ptex examples/stone_wall.ptex examples/rusted_metal.ptex examples/wooden_floor.ptex examples/floor1.ptex
+          echo '--- REAL MATERIAL MAKER OUTPUT ---'
           find "$GITHUB_WORKSPACE/art-assets/materials" -type f -printf '%P %s bytes\n' | sort
+          test "$(find "$GITHUB_WORKSPACE/art-assets/materials" -type f | wc -l)" -gt 5
 
       - name: Record hashes and provenance
         shell: bash
@@ -71,9 +71,9 @@ jobs:
           sha256sum art-assets/tools/material_maker_1_3_linux.tar.gz > art-assets/MATERIAL_MAKER_SHA256.txt
           cat > art-assets/PROVENANCE.txt <<'EOF'
           Godot mannequiny.glb: godotengine/godot-demo-projects, GDQuest, CC BY 4.0.
-          Cat humanoids/textures: catprisbrey/Cats-Godot4-Modular-Souls-like-Template, commit d8bceffc5bf4afe585a3a926fd9aa60ebd26e001, repository LICENSE is Unlicense/public domain.
-          Material Maker: RodZill4/material-maker 1.3 actual Linux release executable, based on Godot 3.5.2.
-          Material Maker export step is real and its success/failure is visible in CI. No generated maps are claimed unless files exist in materials/.
+          Cat humanoids/textures/animation library: catprisbrey/Cats-Godot4-Modular-Souls-like-Template, commit d8bceffc5bf4afe585a3a926fd9aa60ebd26e001, repository LICENSE is Unlicense/public domain.
+          Material Maker: RodZill4/material-maker 1.3 actual Linux release executable, Godot 3.5.2 build.
+          Generated materials: exported by the actual Material Maker executable from its bundled .ptex example graphs using target Godot/Godot 4 Standard.
           EOF
 
       - name: Upload real asset bridge artifact
