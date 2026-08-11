@@ -9,11 +9,17 @@ jobs:
   fetch-assets:
     runs-on: ubuntu-latest
     steps:
+      - name: Install software-rendering support
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0
+
       - name: Fetch real GitHub/Godot assets
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p art-assets/models art-assets/tools
+          mkdir -p art-assets/models art-assets/tools art-assets/materials
           curl -L --fail --retry 3 \
             -o art-assets/models/mannequiny.glb \
             https://raw.githubusercontent.com/godotengine/godot-demo-projects/6ad6167e0577fe3622c18546138f456b107ce93c/3d/ragdoll_physics/characters/mannequiny.glb
@@ -23,12 +29,45 @@ jobs:
           curl -L --fail --retry 3 \
             -o art-assets/tools/material_maker_1_7_linux.tar.gz \
             https://github.com/RodZill4/material-maker/releases/download/1.7/material_maker_1_7_linux.tar.gz
+
+      - name: Export real Material Maker PBR materials at 2048
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p mm
+          tar -xzf art-assets/tools/material_maker_1_7_linux.tar.gz -C mm
+          MM_DIR="$GITHUB_WORKSPACE/mm/material_maker_1_7_linux"
+          chmod +x "$MM_DIR/material_maker.x86_64"
+          cd "$MM_DIR"
+          GODOT_SILENCE_ROOT_WARNING=1 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            ./material_maker.x86_64 \
+            --audio-driver Dummy \
+            --rendering-driver opengl3 \
+            --export-material \
+            --target "Godot/Godot 4 Standard" \
+            --output-dir "$GITHUB_WORKSPACE/art-assets/materials" \
+            examples/improved_brick.ptex \
+            examples/stone_wall.ptex \
+            examples/rusted_metal.ptex \
+            examples/wooden_floor.ptex \
+            examples/floor1.ptex
+
+      - name: Record hashes and provenance
+        shell: bash
+        run: |
           sha256sum art-assets/models/mannequiny.glb art-assets/tools/material_maker_1_7_linux.tar.gz > art-assets/SHA256SUMS.txt
-      - name: Upload asset bridge artifact
+          cat > art-assets/PROVENANCE.txt <<'EOF'
+          mannequiny.glb: godotengine/godot-demo-projects, Ragdoll Physics demo, GDQuest model, CC BY 4.0
+          Material Maker: RodZill4/material-maker 1.7, actual Linux release executable
+          Generated material sources: Material Maker 1.7 bundled example .ptex graphs
+          Export target: Godot/Godot 4 Standard
+          Export resolution: Material Maker command-line default 2048x2048
+          EOF
+
+      - name: Upload real asset bridge artifact
         uses: actions/upload-artifact@v4
         with:
           name: balls-out-art-assets
           path: art-assets/
           compression-level: 0
           retention-days: 1
-# trigger asset bridge
