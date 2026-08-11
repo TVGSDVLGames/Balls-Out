@@ -1,0 +1,32 @@
+name: Fetch Godot 4.7.1 Web Templates
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fetch-web-template-471.yml'
+  workflow_dispatch:
+
+jobs:
+  fetch-web-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download official Godot 4.7.1 export templates
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 -o templates.tpz \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          unzip -l templates.tpz | grep -Ei 'templates/.*web.*\.zip' | tee web-template-list.txt
+          mkdir -p web-templates
+          unzip -j templates.tpz 'templates/*web*.zip' -d web-templates/
+          ls -lh web-templates/
+
+      - name: Upload Web templates only
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-4.7.1-web-templates
+          path: |
+            web-templates/
+            web-template-list.txt
+          compression-level: 0
+          retention-days: 1
