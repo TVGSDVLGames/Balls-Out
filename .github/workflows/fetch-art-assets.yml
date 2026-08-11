@@ -1,0 +1,33 @@
+name: Fetch Balls Out Art Assets
+on:
+  push:
+    paths:
+      - '.github/workflows/fetch-art-assets.yml'
+  workflow_dispatch:
+
+jobs:
+  fetch-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch real GitHub/Godot assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p art-assets/models art-assets/tools
+          curl -L --fail --retry 3 \
+            -o art-assets/models/mannequiny.glb \
+            https://raw.githubusercontent.com/godotengine/godot-demo-projects/6ad6167e0577fe3622c18546138f456b107ce93c/3d/ragdoll_physics/characters/mannequiny.glb
+          curl -L --fail --retry 3 \
+            -o art-assets/models/mannequiny.LICENSE.md \
+            https://raw.githubusercontent.com/godotengine/godot-demo-projects/6ad6167e0577fe3622c18546138f456b107ce93c/3d/ragdoll_physics/characters/mannequiny.LICENSE.md
+          curl -L --fail --retry 3 \
+            -o art-assets/tools/material_maker_1_7_linux.tar.gz \
+            https://github.com/RodZill4/material-maker/releases/download/1.7/material_maker_1_7_linux.tar.gz
+          sha256sum art-assets/models/mannequiny.glb art-assets/tools/material_maker_1_7_linux.tar.gz > art-assets/SHA256SUMS.txt
+      - name: Upload asset bridge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: balls-out-art-assets
+          path: art-assets/
+          compression-level: 0
+          retention-days: 1
