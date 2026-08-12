@@ -1,6 +1,6 @@
 # ▶ Play Balls Out in Your Browser
 
-## **[LAUNCH THE PLAYABLE BUILD →](https://balls-out-play-tvhsdvlgames.vercel.app/)**
+## **[LAUNCH THE PLAYABLE BUILD →](https://rawcdn.githack.com/TVGSDVLGames/Balls-Out/191d400e72941c13a34c8a6f7adb6fb89ad2c36e/web/index.html)**
 
 **No download or installation required.** Browser portfolio demo with controller support; the repository below tracks the current P51 Godot project.
 
