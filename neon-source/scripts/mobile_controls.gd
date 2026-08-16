@@ -160,7 +160,7 @@ func _input(event):
             get_viewport().set_input_as_handled()
             return
         if event.index == drag_touch:
-            var d := event.position - drag_last
+            var d: Vector2 = event.position - drag_last
             drag_last = event.position
             # Safari/WebKit can occasionally deliver a large discontinuity when
             # touch coordinates are resampled.  Clamp that single event rather
