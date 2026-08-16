@@ -1,0 +1,27 @@
+name: temp-homer-lfs-fetch
+
+on:
+  push:
+    paths:
+      - '.github/workflows/temp_homer_fetch.yml'
+
+jobs:
+  fetch-homer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Homer Blender LFS object
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 \
+            -o Homer-3d-with-animated-walk-cycle.blend \
+            'https://media.githubusercontent.com/media/bxbrenden/Homer-3D-Blender/main/Homer-3d-with-animated-walk-cycle.blend'
+          test "$(stat -c%s Homer-3d-with-animated-walk-cycle.blend)" -gt 7000000
+          file Homer-3d-with-animated-walk-cycle.blend
+          sha256sum Homer-3d-with-animated-walk-cycle.blend
+      - name: Upload Homer blend
+        uses: actions/upload-artifact@v4
+        with:
+          name: homer-github-blend
+          path: Homer-3d-with-animated-walk-cycle.blend
+          if-no-files-found: error
+          retention-days: 1
