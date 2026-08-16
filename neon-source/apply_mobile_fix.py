@@ -12,17 +12,8 @@ def replace_once(old: str, new: str, label: str):
         raise SystemExit(f"{label}: expected exactly 1 match, got {count}")
     text = text.replace(old, new, 1)
 
-replace_once(
-'''var mobile_move := Vector2.ZERO
-var mobile_fire_held := false
-var player := Vector2(120, 240)''',
-'''var mobile_move := Vector2.ZERO
-var mobile_fire_held := false
-var mobile_drag_active := false
-var mobile_drag_pending := Vector2.ZERO
-var player := Vector2(120, 240)''',
-"mobile state vars")
-
+# Mobile controls own only MOVE / FIRE / PAUSE.  The old drag_target signal is
+# deliberately disconnected so touching the playfield cannot move the ship.
 replace_once(
 '''    mobile_controls.move_changed.connect(_on_mobile_move)
     mobile_controls.fire_changed.connect(_on_mobile_fire)
@@ -30,71 +21,34 @@ replace_once(
     mobile_controls.drag_target.connect(_on_mobile_drag)''',
 '''    mobile_controls.move_changed.connect(_on_mobile_move)
     mobile_controls.fire_changed.connect(_on_mobile_fire)
-    mobile_controls.pause_pressed.connect(_on_mobile_pause)
-    mobile_controls.drag_delta.connect(_on_mobile_drag_delta)
-    mobile_controls.drag_active_changed.connect(_on_mobile_drag_active)''',
+    mobile_controls.pause_pressed.connect(_on_mobile_pause)''',
 "mobile signal connections")
 
+# iOS/WebKit touch input is also converted by Godot into emulated mouse input.
+# The old mouse branch moved player_target on any left press, which meant FIRE,
+# PAUSE and unrelated touches could move/teleport the ship.  In mobile mode:
+# - a real touch can start the game from attract/title
+# - all gameplay ScreenTouch/ScreenDrag events are left to MobileControls
+# - all mouse events are ignored by gameplay, including touch-emulated mouse
 replace_once(
-'''func read_controls():
-    var move := Input.get_vector("move_left", "move_right", "move_up", "move_down", 0.16)
-    if mobile_move.length() > move.length():
-        move = mobile_move
-    if move.length() > 0.05:
-        # Analog magnitude is preserved so mobile stick and gamepad both retain fine control.
-        player_target = player + move * (2.2 + 2.2 * move.length())
+'''    if mobile_mode and (event is InputEventScreenTouch or event is InputEventScreenDrag):
+        return
 
-    if Input.is_action_pressed("fire") or mobile_fire_held:
-        fire_requested = true
+    if paused_game:
+        return
 ''',
-'''func read_controls():
-    var move := Input.get_vector("move_left", "move_right", "move_up", "move_down", 0.16)
-    if not mobile_drag_active and mobile_move.length() > move.length():
-        move = mobile_move
+'''    if mobile_mode:
+        if event is InputEventScreenTouch:
+            if event.pressed and not started:
+                start_game()
+            return
+        if event is InputEventScreenDrag or event is InputEventMouseButton or event is InputEventMouseMotion:
+            return
 
-    if mobile_drag_active and mobile_drag_pending.length() > 0.01:
-        # Consume relative touch motion once per source tick. The target is
-        # always based on the current player position, so drag cannot build up
-        # a giant stale target behind a mushroom or after a WebKit touch jump.
-        var drag_step := mobile_drag_pending
-        mobile_drag_pending = Vector2.ZERO
-        player_target = Vector2(
-            clampf(player.x + drag_step.x, 4.0, 236.0),
-            clampf(player.y + drag_step.y, PLAYER_TOP + 4.0, 248.0)
-        )
-    elif move.length() > 0.05:
-        # Analog magnitude is preserved so floating mobile stick and gamepad
-        # both retain fine control.
-        player_target = player + move * (2.2 + 2.2 * move.length())
-
-    if Input.is_action_pressed("fire") or mobile_fire_held:
-        fire_requested = true
+    if paused_game:
+        return
 ''',
-"read_controls")
-
-replace_once(
-'''func _on_mobile_drag(screen_position: Vector2):
-    if started and not paused_game:
-        var logical := screen_to_logical(screen_position)
-        player_target = Vector2(clamp(logical.x,4.0,236.0), clamp(logical.y,PLAYER_TOP+4.0,248.0))
-''',
-'''func _on_mobile_drag_delta(screen_delta: Vector2):
-    if started and not paused_game:
-        # Screen touch movement becomes trackball-like relative motion instead
-        # of teleporting the player to the finger's absolute screen location.
-        var logical_delta := Vector2(screen_delta.x / SX, screen_delta.y / SY) * 0.85
-        mobile_drag_pending += logical_delta
-        if mobile_drag_pending.length() > 14.0:
-            mobile_drag_pending = mobile_drag_pending.normalized() * 14.0
-
-func _on_mobile_drag_active(active: bool):
-    mobile_drag_active = active
-    if not active:
-        mobile_drag_pending = Vector2.ZERO
-        if started and not paused_game:
-            player_target = player
-''',
-"mobile drag handler")
+"strict mobile input guard")
 
 path.write_text(text)
 print(f"patched {path}")
