@@ -1,0 +1,35 @@
+name: Materialize Neon Millipede PCK
+on:
+  push:
+    branches: [neon-millipede-public]
+    paths:
+      - '.github/workflows/materialize-neon-pck.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: neon-millipede-public
+      - name: Rebuild exact PCK and verify hash
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat neon-millipede/pck.part00 neon-millipede/pck.part01 neon-millipede/pck.part02 | base64 -d > /tmp/neon.pck.gz
+          gzip -dc /tmp/neon.pck.gz > neon-live/neon.pck
+          echo '520dd8f6fa0d4380b1e840480d7378f2d8b02e10f0448333edb4913c93dd00e6  neon-live/neon.pck' | sha256sum -c -
+          test $(stat -c%s neon-live/neon.pck) -gt 50000
+          ls -lh neon-live/neon.pck
+      - name: Commit public binary pack
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f neon-live/neon.pck
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'materialize Neon Millipede PCK for Safari'
+          git push origin HEAD:neon-millipede-public
