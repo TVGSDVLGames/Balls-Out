@@ -16,20 +16,20 @@ jobs:
         run: |
           set -euxo pipefail
           BASE='https://raw.githack.com/TVGSDVLGames/Balls-Out/neon-millipede-public'
-          for n in {1..12}; do
-            if curl -fLsS --max-time 30 "$BASE/neon-live/index.html" -o /tmp/index.html; then break; fi
+          for n in {1..18}; do
+            if curl -fLsS --max-time 30 "$BASE/neon-live/index.html?v=4" -o /tmp/index.html && grep -q 'build 4' /tmp/index.html; then break; fi
             sleep 5
           done
           grep -q 'NEON' /tmp/index.html
           grep -q 'TAP TO PLAY' /tmp/index.html
-          curl -fLsS --max-time 60 "$BASE/web/index.js" -o /tmp/index.js
+          grep -q 'neon.pck?v=4' /tmp/index.html
+          curl -fLsS --max-time 60 "$BASE/web/index.js?v=4" -o /tmp/index.js
           test -s /tmp/index.js
           curl -fLsS --max-time 180 "$BASE/web/index.wasm" -o /tmp/index.wasm
           test $(stat -c%s /tmp/index.wasm) -gt 30000000
-          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part00" -o /tmp/p0
-          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part01" -o /tmp/p1
-          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part02" -o /tmp/p2
-          test -s /tmp/p0
-          test -s /tmp/p1
-          test -s /tmp/p2
-          echo "PUBLIC_URL=$BASE/neon-live/index.html"
+          curl -fLsS --max-time 60 "$BASE/neon-live/neon.pck?v=4" -o /tmp/neon.pck
+          test $(stat -c%s /tmp/neon.pck) -eq 297908
+          echo '16c877c34f2857d5eda29e9f1c086a679735fc4b35d3e61d14fc1cba63ca9ebc  /tmp/neon.pck' | sha256sum -c -
+          printf 'HEADER='; head -c4 /tmp/neon.pck | xxd -p
+          test "$(head -c4 /tmp/neon.pck)" = 'GDPC'
+          echo "PUBLIC_URL=$BASE/neon-live/index.html?v=4"
