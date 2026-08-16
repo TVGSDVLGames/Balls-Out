@@ -44,9 +44,14 @@ jobs:
 
           cp neon-source/scripts/mobile_controls.gd "$ROOT/scripts/mobile_controls.gd"
           python3 neon-source/apply_mobile_fix.py "$ROOT/scripts/main.gd"
-          grep -q 'signal drag_delta' "$ROOT/scripts/mobile_controls.gd"
-          grep -q 'func _on_mobile_drag_delta' "$ROOT/scripts/main.gd"
-          grep -q 'mobile_drag_active' "$ROOT/scripts/main.gd"
+
+          # Hard requirements for this build: no playfield-drag signal, no
+          # touch-to-player target path connected, and mobile gameplay ignores
+          # both real touch events and touch-emulated mouse events in main.gd.
+          ! grep -q 'drag_target.connect' "$ROOT/scripts/main.gd"
+          ! grep -q 'signal drag_' "$ROOT/scripts/mobile_controls.gd"
+          grep -q 'event is InputEventMouseButton or event is InputEventMouseMotion' "$ROOT/scripts/main.gd"
+          grep -q 'Touching the playfield does absolutely nothing' "$ROOT/scripts/mobile_controls.gd"
 
           cat > "$ROOT/export_presets.cfg" <<'EOF'
           [preset.0]
@@ -91,7 +96,7 @@ jobs:
           echo "GODOT_BIN=$GODOT" >> "$GITHUB_ENV"
           "$GODOT" --version
 
-      - name: Build one real PCK and reject script errors
+      - name: Build, mobile-input smoke test, and reject script errors
         shell: bash
         run: |
           set -euxo pipefail
@@ -105,6 +110,112 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|Failed to load script|Invalid access to property' /tmp/neon-import.log; then
             echo 'GDScript/import error detected'; exit 1
           fi
+
+          cat > "$PROJECT_ROOT/mobile_input_smoke.gd" <<'EOF'
+          extends SceneTree
+
+          var game
+
+          func _initialize():
+              game = load("res://main.tscn").instantiate()
+              root.add_child(game)
+              call_deferred("_run")
+
+          func fail(msg: String):
+              push_error("MOBILE_INPUT_SMOKE_FAIL: " + msg)
+              quit(1)
+
+          func _run():
+              await process_frame
+              game.mobile_mode = true
+              game.started = true
+              game.paused_game = false
+              game.mobile_controls.set_controls_enabled(true)
+              game.player = Vector2(120, 240)
+              game.player_target = game.player
+              game.mobile_move = Vector2.ZERO
+              game.mobile_fire_held = false
+              var initial: Vector2 = game.player_target
+
+              # A playfield touch sent to gameplay must do nothing.
+              var play_touch := InputEventScreenTouch.new()
+              play_touch.index = 20
+              play_touch.position = Vector2(380, 420)
+              play_touch.pressed = true
+              game._input(play_touch)
+              if game.player_target != initial:
+                  fail("playfield ScreenTouch changed player_target")
+
+              # This is the exact class of synthetic event Godot creates from a
+              # touchscreen when emulate_mouse_from_touch is enabled.  FIRE area
+              # mouse presses must never enter the desktop move-to-pointer path.
+              var fake_mouse := InputEventMouseButton.new()
+              fake_mouse.button_index = MOUSE_BUTTON_LEFT
+              fake_mouse.position = game.mobile_controls.fire_center()
+              fake_mouse.pressed = true
+              game._input(fake_mouse)
+              if game.player_target != initial:
+                  fail("touch-emulated MouseButton changed player_target")
+
+              # A real FIRE touch may set fire only; it must not move.
+              var fire_touch := InputEventScreenTouch.new()
+              fire_touch.index = 21
+              fire_touch.position = game.mobile_controls.fire_center()
+              fire_touch.pressed = true
+              game.mobile_controls._input(fire_touch)
+              if not game.mobile_fire_held:
+                  fail("FIRE did not engage")
+              if game.player_target != initial or game.mobile_move != Vector2.ZERO:
+                  fail("FIRE changed movement state")
+
+              # Dragging the FIRE finger also must not become movement.
+              var fire_drag := InputEventScreenDrag.new()
+              fire_drag.index = 21
+              fire_drag.position = game.mobile_controls.fire_center() + Vector2(-120, -80)
+              game.mobile_controls._input(fire_drag)
+              if game.player_target != initial or game.mobile_move != Vector2.ZERO:
+                  fail("FIRE drag changed movement state")
+
+              # Touching/dragging the playfield through MobileControls is inert.
+              var inert_touch := InputEventScreenTouch.new()
+              inert_touch.index = 22
+              inert_touch.position = Vector2(300, 500)
+              inert_touch.pressed = true
+              game.mobile_controls._input(inert_touch)
+              var inert_drag := InputEventScreenDrag.new()
+              inert_drag.index = 22
+              inert_drag.position = Vector2(500, 700)
+              game.mobile_controls._input(inert_drag)
+              if game.player_target != initial or game.mobile_move != Vector2.ZERO:
+                  fail("playfield touch/drag changed movement state")
+
+              # The left stick is the one and only mobile movement path.
+              var stick_touch := InputEventScreenTouch.new()
+              stick_touch.index = 23
+              stick_touch.position = game.mobile_controls.stick_center()
+              stick_touch.pressed = true
+              game.mobile_controls._input(stick_touch)
+              var stick_drag := InputEventScreenDrag.new()
+              stick_drag.index = 23
+              stick_drag.position = game.mobile_controls.stick_center() + Vector2(70, 0)
+              game.mobile_controls._input(stick_drag)
+              if game.mobile_move.x <= 0.1:
+                  fail("joystick did not produce movement")
+
+              print("MOBILE_INPUT_SMOKE_OK")
+              quit(0)
+          EOF
+
+          set +e
+          "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --script "$PROJECT_ROOT/mobile_input_smoke.gd" --audio-driver Dummy --rendering-driver dummy 2>&1 | tee /tmp/mobile-input-smoke.log
+          SMOKE_RC=${PIPESTATUS[0]}
+          set -e
+          test "$SMOKE_RC" -eq 0
+          grep -q 'MOBILE_INPUT_SMOKE_OK' /tmp/mobile-input-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|Failed to load script|Invalid access to property|MOBILE_INPUT_SMOKE_FAIL' /tmp/mobile-input-smoke.log; then
+            echo 'Mobile input smoke failure'; exit 1
+          fi
+          rm -f "$PROJECT_ROOT/mobile_input_smoke.gd"
 
           set +e
           "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --export-pack Web "$GITHUB_WORKSPACE/neon-live/neon.pck" 2>&1 | tee /tmp/neon-export.log
@@ -138,5 +249,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f neon-live/neon.pck neon-live/neon.pck.sha256
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'publish Neon Millipede mobile-control build'
+          git commit -m 'publish Neon Millipede strict mobile controls'
           git push origin HEAD:neon-millipede-public
