@@ -11,6 +11,8 @@ on:
       - 'neon-build/src2.tail00c'
       - 'neon-build/src2.tail01'
       - 'neon-build/src2.tail02'
+      - 'neon-source/scripts/mobile_controls.gd'
+      - 'neon-source/apply_mobile_fix.py'
       - '.github/workflows/materialize-neon-pck.yml'
   workflow_dispatch:
 permissions:
@@ -24,7 +26,7 @@ jobs:
         with:
           ref: neon-millipede-public
 
-      - name: Restore exact Godot project source
+      - name: Restore exact Godot project source and apply mobile fix
         shell: bash
         run: |
           set -euxo pipefail
@@ -39,6 +41,16 @@ jobs:
           test -n "$PROJECT"
           ROOT=$(dirname "$PROJECT")
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+          # Overlay the rebuilt mobile control layer and deterministically patch
+          # the main script to use relative trackball deltas instead of absolute
+          # touch teleporting.
+          cp neon-source/scripts/mobile_controls.gd "$ROOT/scripts/mobile_controls.gd"
+          python3 neon-source/apply_mobile_fix.py "$ROOT/scripts/main.gd"
+          grep -q 'signal drag_delta' "$ROOT/scripts/mobile_controls.gd"
+          grep -q 'func _on_mobile_drag_delta' "$ROOT/scripts/main.gd"
+          grep -q 'mobile_drag_active' "$ROOT/scripts/main.gd"
+
           cat > "$ROOT/export_presets.cfg" <<'EOF'
           [preset.0]
           name="Web"
@@ -86,15 +98,15 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          rm -f neon-live/neon.pck
+          rm -f neon-live/neon.pck neon-live/neon.pck.sha256
           "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --import --editor --quit
           "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --export-pack Web "$GITHUB_WORKSPACE/neon-live/neon.pck"
           test -s neon-live/neon.pck
           SIZE=$(stat -c%s neon-live/neon.pck)
           test "$SIZE" -gt 100000
-          sha256sum neon-live/neon.pck
+          sha256sum neon-live/neon.pck | tee neon-live/neon.pck.sha256
           ls -lh neon-live/neon.pck
-          "$GODOT_BIN" --headless --main-pack "$GITHUB_WORKSPACE/neon-live/neon.pck" --quit-after 120 --audio-driver Dummy --rendering-driver dummy
+          "$GODOT_BIN" --headless --main-pack "$GITHUB_WORKSPACE/neon-live/neon.pck" --quit-after 180 --audio-driver Dummy --rendering-driver dummy
 
       - name: Commit public binary pack
         shell: bash
@@ -102,7 +114,7 @@ jobs:
           set -euxo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f neon-live/neon.pck
+          git add -f neon-live/neon.pck neon-live/neon.pck.sha256
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'publish verified Neon Millipede PCK'
+          git commit -m 'publish Neon Millipede mobile-control build'
           git push origin HEAD:neon-millipede-public
