@@ -3,7 +3,12 @@ on:
   push:
     branches: [neon-millipede-public]
     paths:
-      - 'neon-build/source.tar.gz.b64'
+      - 'neon-build/src2.part00'
+      - 'neon-build/src2.part01'
+      - 'neon-build/src2.part02'
+      - 'neon-build/src2.tail00'
+      - 'neon-build/src2.tail01'
+      - 'neon-build/src2.tail02'
       - '.github/workflows/materialize-neon-pck.yml'
   workflow_dispatch:
 permissions:
@@ -21,9 +26,12 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          cat neon-build/src2.part00 neon-build/src2.part01 neon-build/src2.part02 neon-build/src2.tail00 neon-build/src2.tail01 neon-build/src2.tail02 > /tmp/source.b64
+          test "$(wc -c < /tmp/source.b64)" -eq 48660
+          base64 -d /tmp/source.b64 > /tmp/neon-src.tar.gz
+          echo 'c59aec14bf1996aabdde5cd01f723b335a47d73dafdbbd1b503fe785fc239656  /tmp/neon-src.tar.gz' | sha256sum -c -
           rm -rf /tmp/neon-src
           mkdir -p /tmp/neon-src
-          base64 -d neon-build/source.tar.gz.b64 > /tmp/neon-src.tar.gz
           tar -xzf /tmp/neon-src.tar.gz -C /tmp/neon-src
           PROJECT=$(find /tmp/neon-src -name project.godot -print -quit)
           test -n "$PROJECT"
