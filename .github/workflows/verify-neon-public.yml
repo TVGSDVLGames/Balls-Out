@@ -22,9 +22,14 @@ jobs:
           done
           grep -q 'NEON' /tmp/index.html
           grep -q 'TAP TO PLAY' /tmp/index.html
-          curl -fLsSI --max-time 30 "$BASE/web/index.js"
-          curl -fLsSI --max-time 30 "$BASE/web/index.wasm"
-          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part00"
-          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part01"
-          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part02"
+          curl -fLsS --max-time 60 "$BASE/web/index.js" -o /tmp/index.js
+          test -s /tmp/index.js
+          curl -fLsS --max-time 180 "$BASE/web/index.wasm" -o /tmp/index.wasm
+          test $(stat -c%s /tmp/index.wasm) -gt 30000000
+          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part00" -o /tmp/p0
+          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part01" -o /tmp/p1
+          curl -fLsS --max-time 30 "$BASE/neon-millipede/pck.part02" -o /tmp/p2
+          test -s /tmp/p0
+          test -s /tmp/p1
+          test -s /tmp/p2
           echo "PUBLIC_URL=$BASE/neon-live/index.html"
