@@ -1,0 +1,35 @@
+name: Expose Neon Input Source
+on:
+  push:
+    branches: [neon-millipede-public]
+    paths:
+      - '.github/workflows/expose-neon-input-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: neon-millipede-public
+      - name: Extract exact source used by working build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat neon-build/src2.part00 neon-build/src2.part01 neon-build/src2.part02 neon-build/src2.tail00a neon-build/src2.tail00b neon-build/src2.tail00c neon-build/src2.tail01 neon-build/src2.tail02 > /tmp/source.b64
+          test "$(wc -c < /tmp/source.b64)" -eq 48660
+          base64 -d /tmp/source.b64 > /tmp/neon-src.tar.gz
+          echo 'c59aec14bf1996aabdde5cd01f723b335a47d73dafdbbd1b503fe785fc239656  /tmp/neon-src.tar.gz' | sha256sum -c -
+          rm -rf /tmp/neon-src neon-source
+          mkdir -p /tmp/neon-src neon-source/scripts
+          tar -xzf /tmp/neon-src.tar.gz -C /tmp/neon-src
+          cp /tmp/neon-src/scripts/mobile_controls.gd neon-source/scripts/mobile_controls.gd
+          cp /tmp/neon-src/scripts/main.gd neon-source/scripts/main.gd
+          cp /tmp/neon-src/project.godot neon-source/project.godot
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add neon-source
+          git commit -m 'expose exact Neon input source' || exit 0
+          git push origin HEAD:neon-millipede-public
