@@ -1,0 +1,30 @@
+name: Verify Neon Millipede Public URL
+on:
+  push:
+    branches: [neon-millipede-public]
+    paths:
+      - 'neon-live/**'
+      - '.github/workflows/verify-neon-public.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public raw.githack site and assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE='https://raw.githack.com/TVGSDVLGames/Balls-Out/neon-millipede-public'
+          for n in {1..12}; do
+            if curl -fLsS --max-time 30 "$BASE/neon-live/index.html" -o /tmp/index.html; then break; fi
+            sleep 5
+          done
+          grep -q 'NEON' /tmp/index.html
+          grep -q 'TAP TO PLAY' /tmp/index.html
+          curl -fLsSI --max-time 30 "$BASE/web/index.js"
+          curl -fLsSI --max-time 30 "$BASE/web/index.wasm"
+          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part00"
+          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part01"
+          curl -fLsSI --max-time 30 "$BASE/neon-millipede/pck.part02"
+          echo "PUBLIC_URL=$BASE/neon-live/index.html"
