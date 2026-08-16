@@ -1,0 +1,35 @@
+name: Fix Neon Mobile Source
+on:
+  push:
+    branches: [neon-millipede-public]
+    paths:
+      - '.github/workflows/fix-neon-mobile-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: neon-millipede-public
+      - name: Fix explicit Vector2 type and commit source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('neon-source/scripts/mobile_controls.gd')
+          s = p.read_text()
+          old = '            var d := event.position - drag_last\n'
+          new = '            var d: Vector2 = event.position - drag_last\n'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one touch-delta declaration, got {s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add neon-source/scripts/mobile_controls.gd
+          git commit -m 'fix mobile touch delta Vector2 type'
+          git push origin HEAD:neon-millipede-public
