@@ -3,6 +3,7 @@ on:
   push:
     branches: [neon-millipede-public]
     paths:
+      - 'neon-build/source.tar.gz.b64'
       - '.github/workflows/materialize-neon-pck.yml'
   workflow_dispatch:
 permissions:
@@ -10,19 +11,81 @@ permissions:
 jobs:
   materialize:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           ref: neon-millipede-public
-      - name: Rebuild exact PCK and verify hash
+
+      - name: Restore exact Godot project source
         shell: bash
         run: |
           set -euxo pipefail
-          cat neon-millipede/pck.part00 neon-millipede/pck.part01 neon-millipede/pck.part02 | base64 -d > /tmp/neon.pck.gz
-          gzip -dc /tmp/neon.pck.gz > neon-live/neon.pck
-          echo '520dd8f6fa0d4380b1e840480d7378f2d8b02e10f0448333edb4913c93dd00e6  neon-live/neon.pck' | sha256sum -c -
-          test $(stat -c%s neon-live/neon.pck) -gt 50000
+          rm -rf /tmp/neon-src
+          mkdir -p /tmp/neon-src
+          base64 -d neon-build/source.tar.gz.b64 > /tmp/neon-src.tar.gz
+          tar -xzf /tmp/neon-src.tar.gz -C /tmp/neon-src
+          PROJECT=$(find /tmp/neon-src -name project.godot -print -quit)
+          test -n "$PROJECT"
+          ROOT=$(dirname "$PROJECT")
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          cat > "$ROOT/export_presets.cfg" <<'EOF'
+          [preset.0]
+          name="Web"
+          platform="Web"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="scenes"
+          export_files=PackedStringArray("res://main.tscn")
+          include_filter=""
+          exclude_filter=""
+          export_path="web/index.html"
+          script_export_mode=1
+
+          [preset.0.options]
+          variant/extensions_support=false
+          variant/thread_support=false
+          vram_texture_compression/for_desktop=true
+          vram_texture_compression/for_mobile=false
+          html/export_icon=true
+          html/custom_html_shell=""
+          html/head_include=""
+          html/canvas_resize_policy=2
+          html/focus_canvas_on_start=true
+          html/experimental_virtual_keyboard=false
+          progressive_web_app/enabled=false
+          EOF
+          find "$ROOT" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort
+
+      - name: Download Godot 4.7.1 Linux editor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          rm -rf /tmp/godot
+          mkdir -p /tmp/godot
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          GODOT=$(find /tmp/godot -maxdepth 2 -type f -name '*linux.x86_64' -print -quit)
+          test -n "$GODOT"
+          chmod +x "$GODOT"
+          echo "GODOT_BIN=$GODOT" >> "$GITHUB_ENV"
+          "$GODOT" --version
+
+      - name: Build one real PCK and runtime-test it
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -f neon-live/neon.pck
+          "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --import --editor --quit
+          "$GODOT_BIN" --headless --path "$PROJECT_ROOT" --export-pack Web "$GITHUB_WORKSPACE/neon-live/neon.pck"
+          test -s neon-live/neon.pck
+          SIZE=$(stat -c%s neon-live/neon.pck)
+          test "$SIZE" -gt 100000
+          sha256sum neon-live/neon.pck
           ls -lh neon-live/neon.pck
+          "$GODOT_BIN" --headless --main-pack "$GITHUB_WORKSPACE/neon-live/neon.pck" --quit-after 120 --audio-driver Dummy --rendering-driver dummy
+
       - name: Commit public binary pack
         shell: bash
         run: |
@@ -31,5 +94,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f neon-live/neon.pck
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'materialize Neon Millipede PCK for Safari'
+          git commit -m 'publish verified Neon Millipede PCK'
           git push origin HEAD:neon-millipede-public
