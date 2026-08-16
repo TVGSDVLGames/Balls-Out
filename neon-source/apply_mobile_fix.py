@@ -36,11 +36,6 @@ replace_once(
 "mobile signal connections")
 
 replace_once(
-'''        "MOBILE IN-GAME: LEFT STICK + DRAG • HOLD FIRE • PAUSE"''',
-'''        "MOBILE: FLOATING STICK OR TRACKBALL DRAG • HOLD FIRE • PAUSE"''',
-"mobile hint")
-
-replace_once(
 '''func read_controls():
     var move := Input.get_vector("move_left", "move_right", "move_up", "move_down", 0.16)
     if mobile_move.length() > move.length():
@@ -58,7 +53,7 @@ replace_once(
         move = mobile_move
 
     if mobile_drag_active and mobile_drag_pending.length() > 0.01:
-        # Consume relative touch motion once per source tick.  The target is
+        # Consume relative touch motion once per source tick. The target is
         # always based on the current player position, so drag cannot build up
         # a giant stale target behind a mushroom or after a WebKit touch jump.
         var drag_step := mobile_drag_pending
