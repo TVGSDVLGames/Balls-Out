@@ -1,0 +1,58 @@
+name: Publish BoxedWine 25R1 Runtime
+
+on:
+  push:
+    branches:
+      - boxedwine-runtime
+    paths:
+      - .github/workflows/publish-boxedwine-runtime.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out isolated runtime branch
+        uses: actions/checkout@v4
+        with:
+          ref: boxedwine-runtime
+
+      - name: Download official BoxedWine 25R1 web release
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            https://github.com/danoon2/Boxedwine/releases/download/25R1.0/Boxedwine25R1Web.zip \
+            -o /tmp/Boxedwine25R1Web.zip
+          echo "b10e46bbe8b236d9b8088b3cf8a63d285154763c07d2fc4acb26999e10ad8f7d  /tmp/Boxedwine25R1Web.zip" | sha256sum -c -
+
+      - name: Extract browser runtime
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/bw25 runtime
+          mkdir -p /tmp/bw25 runtime
+          unzip -q /tmp/Boxedwine25R1Web.zip -d /tmp/bw25
+          BOXEDWINE_JS="$(find /tmp/bw25 -type f -name boxedwine.js -print -quit)"
+          test -n "$BOXEDWINE_JS"
+          WEB_DIR="$(dirname "$BOXEDWINE_JS")"
+          echo "Runtime directory: $WEB_DIR"
+          find "$WEB_DIR" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+          test -f "$WEB_DIR/boxedwine.wasm"
+          test -f "$WEB_DIR/boxedwine-shell.js"
+          test -f "$WEB_DIR/boxedwine.zip"
+          cp -a "$WEB_DIR"/. runtime/
+          printf 'Official BoxedWine 25R1 web runtime. Source: dano​on2/Boxedwine release 25R1.0\nSHA256 release ZIP: b10e46bbe8b236d9b8088b3cf8a63d285154763c07d2fc4acb26999e10ad8f7d\n' > runtime/SOURCE.txt
+
+      - name: Commit runtime files to this branch only
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime
+          git diff --cached --stat
+          git commit -m "Publish official BoxedWine 25R1 web runtime" || exit 0
+          git push origin HEAD:boxedwine-runtime
