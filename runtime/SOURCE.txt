@@ -1,0 +1,2 @@
+Official BoxedWine 25R1 web runtime. Source: dano​on2/Boxedwine release 25R1.0
+SHA256 release ZIP: b10e46bbe8b236d9b8088b3cf8a63d285154763c07d2fc4acb26999e10ad8f7d
