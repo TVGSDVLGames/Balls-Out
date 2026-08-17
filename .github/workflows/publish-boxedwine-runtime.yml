@@ -56,7 +56,13 @@ jobs:
             grep -Ei "(^|/)$DLL(\\.dll|\\.dll\\.so)(/|$)" /tmp/root-list.txt | head -20
             grep -Eqi "(^|/)$DLL(\\.dll|\\.dll\\.so)(/|$)" /tmp/root-list.txt
           done
-          grep -Ei '(/|^)wineboot$|(/|^)wineserver$|(/|^)wine$' /tmp/root-list.txt | head -50
+          echo '=== prefix / wine boot pieces ==='
+          grep -Ei 'wineboot(\\.exe)?$|wineserver$|/wine$|system\\.reg$|user\\.reg$' /tmp/root-list.txt | head -80
+          grep -Eqi 'home/username/\\.wine/drive_c/windows/system32/wineboot\\.exe$' /tmp/root-list.txt
+          grep -Eqi 'home/username/\\.wine/system\\.reg$' /tmp/root-list.txt
+          echo '=== Wine audio drivers ==='
+          grep -Ei '(wineoss|winealsa|winepulse|winecoreaudio|mmdevapi|winebus)\\.(drv|dll)(\\.so)?$' /tmp/root-list.txt | head -100
+          grep -Eqi 'wineoss\\.drv(\\.so)?$|winealsa\\.drv(\\.so)?$|winepulse\\.drv(\\.so)?$|winecoreaudio\\.drv(\\.so)?$' /tmp/root-list.txt
 
       - name: Commit runtime files to this branch only
         shell: bash
