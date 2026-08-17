@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HR-16 Firmware Emulator Loader</title>
+<style>
+html,body{margin:0;min-height:100%;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif}main{max-width:680px;margin:auto;padding:28px 18px}.box{background:#222;border:1px solid #555;border-radius:12px;padding:20px}h1{font-size:24px;margin:0 0 12px}p{line-height:1.45;color:#ccc}label{display:block;background:#c43b32;color:#fff;font-weight:800;text-align:center;padding:18px 14px;border-radius:9px;margin:20px 0;cursor:pointer}input{position:absolute;left:-9999px}.status{font:700 13px ui-monospace,SFMono-Regular,monospace;color:#9fda9f;white-space:pre-wrap}.small{font-size:12px;color:#999}</style>
+</head>
+<body>
+<main><div class="box">
+<h1>HR-16 REAL FIRMWARE TEST</h1>
+<p>This HTTPS loader runs the exact local Phase 1 HTML you choose. The emulator/ROM stays on your device.</p>
+<label for="file">LOAD HR-16 EMULATOR</label>
+<input id="file" type="file" accept=".html,text/html">
+<div id="status" class="status">READY — choose Alesis_HR16_REAL_FIRMWARE_EMULATOR_PHASE1.html</div>
+<p class="small">After it loads, use the emulator normally. Pad presses remain real user gestures for Web Audio.</p>
+</div></main>
+<script>
+const input=document.getElementById('file');
+const status=document.getElementById('status');
+input.addEventListener('change',async()=>{
+ const f=input.files&&input.files[0];
+ if(!f)return;
+ status.textContent='LOADING '+f.name+' ...';
+ try{
+  const html=await f.text();
+  if(!/HR-16|ALESIS/i.test(html)) throw new Error('That does not look like the HR-16 build.');
+  history.replaceState(null,'',location.href.split('#')[0]+'#hr16-loaded');
+  document.open('text/html','replace');
+  document.write(html);
+  document.close();
+ }catch(e){status.textContent='LOAD ERROR: '+(e&&e.message?e.message:String(e));}
+});
+</script>
+</body>
+</html>
