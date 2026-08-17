@@ -1,0 +1,69 @@
+name: Audit BoxedWine WASM Memory
+
+on:
+  push:
+    branches: [boxedwine-runtime]
+    paths: [.github/workflows/audit-boxedwine-wasm.yml]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: boxedwine-runtime
+      - name: Parse WebAssembly memory section
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f runtime/boxedwine.wasm
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('runtime/boxedwine.wasm').read_bytes()
+          assert b[:4] == bytes([0,97,115,109]) and b[4:8] == bytes([1,0,0,0])
+          def uleb(i):
+              v=0; sh=0
+              while True:
+                  x=b[i]; i+=1; v|=(x&127)<<sh
+                  if not x&128: return v,i
+                  sh+=7
+          p=8; memories=[]; imported=[]
+          while p<len(b):
+              sid=b[p]; p+=1; n,p=uleb(p); end=p+n
+              if sid==2:
+                  count,q=uleb(p)
+                  for _ in range(count):
+                      ln,q=uleb(q); mod=b[q:q+ln].decode(errors='replace'); q+=ln
+                      ln,q=uleb(q); name=b[q:q+ln].decode(errors='replace'); q+=ln
+                      kind=b[q]; q+=1
+                      if kind==0: _,q=uleb(q)
+                      elif kind==1:
+                          q+=1; flags,q=uleb(q); _,q=uleb(q)
+                          if flags&1: _,q=uleb(q)
+                      elif kind==2:
+                          flags,q=uleb(q); mn,q=uleb(q); mx=None
+                          if flags&1: mx,q=uleb(q)
+                          imported.append((mod,name,mn,mx,flags))
+                      elif kind==3: q+=2
+                      elif kind==4: _,q=uleb(q); _,q=uleb(q)
+              elif sid==5:
+                  count,q=uleb(p)
+                  for _ in range(count):
+                      flags,q=uleb(q); mn,q=uleb(q); mx=None
+                      if flags&1: mx,q=uleb(q)
+                      memories.append((mn,mx,flags))
+              p=end
+          print('Imported memory:',imported)
+          print('Defined memory:',memories)
+          assert len(imported)+len(memories)==1
+          if imported:
+              _,_,mn,mx,flags=imported[0]
+          else:
+              mn,mx,flags=memories[0]
+          print(f'INITIAL_PAGES={mn}')
+          print(f'INITIAL_BYTES={mn*65536}')
+          print(f'INITIAL_MIB={mn*65536/1048576:.2f}')
+          print(f'MAX_PAGES={mx}')
+          print('MAX_MIB=' + ('unbounded' if mx is None else f'{mx*65536/1048576:.2f}'))
+          print(f'FLAGS={flags}')
+          PY
