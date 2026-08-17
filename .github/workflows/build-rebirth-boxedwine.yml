@@ -1,4 +1,4 @@
-name: Build ReBirth BoxedWine Variants
+name: Build ReBirth BoxedWine 384 MiB
 
 on:
   push:
@@ -31,93 +31,86 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cp -a /tmp/boxedwine-src /tmp/bw384
-          sed -i 's/-s TOTAL_MEMORY=536870912/-s INITIAL_MEMORY=402653184/' /tmp/bw384/project/emscripten/makefile
-          grep -n 'INITIAL_MEMORY' /tmp/bw384/project/emscripten/makefile
-          cd /tmp/bw384/project/emscripten
+          sed -i 's/-s TOTAL_MEMORY=536870912/-s INITIAL_MEMORY=402653184/' /tmp/boxedwine-src/project/emscripten/makefile
+          grep -n 'INITIAL_MEMORY' /tmp/boxedwine-src/project/emscripten/makefile
+          cd /tmp/boxedwine-src/project/emscripten
           make release
+          rm -rf "$GITHUB_WORKSPACE/runtime/rebirth384"
           mkdir -p "$GITHUB_WORKSPACE/runtime/rebirth384"
           cp Build/Release/boxedwine.js Build/Release/boxedwine.wasm "$GITHUB_WORKSPACE/runtime/rebirth384/"
 
-      - name: Build fixed 256 MiB variant
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cp -a /tmp/boxedwine-src /tmp/bw256
-          sed -i 's/-s TOTAL_MEMORY=536870912/-s INITIAL_MEMORY=268435456/' /tmp/bw256/project/emscripten/makefile
-          grep -n 'INITIAL_MEMORY' /tmp/bw256/project/emscripten/makefile
-          cd /tmp/bw256/project/emscripten
-          make release
-          mkdir -p "$GITHUB_WORKSPACE/runtime/rebirth256"
-          cp Build/Release/boxedwine.js Build/Release/boxedwine.wasm "$GITHUB_WORKSPACE/runtime/rebirth256/"
-
-      - name: Verify generated WASM heaps and sidecars
+      - name: Verify actual WASM memory and generated engine
         shell: bash
         run: |
           set -euxo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          def uleb(b,i):
+          WASM=Path('runtime/rebirth384/boxedwine.wasm')
+          JS=Path('runtime/rebirth384/boxedwine.js')
+          b=WASM.read_bytes()
+          assert b[:8] == b'\0asm\x01\0\0\0'
+          def uleb(i):
               v=0; sh=0
               while True:
                   x=b[i]; i+=1; v|=(x&127)<<sh
                   if not x&128: return v,i
                   sh+=7
-          def memory(path):
-              b=Path(path).read_bytes(); assert b[:8]==b'\0asm\x01\0\0\0'
-              p=8; out=[]; imp=[]
-              while p<len(b):
-                  sid=b[p]; p+=1; n,p=uleb(b,p); end=p+n
-                  if sid==2:
-                      count,q=uleb(b,p)
-                      for _ in range(count):
-                          ln,q=uleb(b,q); mod=b[q:q+ln]; q+=ln
-                          ln,q=uleb(b,q); name=b[q:q+ln]; q+=ln
-                          kind=b[q]; q+=1
-                          if kind==0: _,q=uleb(b,q)
-                          elif kind==1:
-                              q+=1; flags,q=uleb(b,q); _,q=uleb(b,q)
-                              if flags&1: _,q=uleb(b,q)
-                          elif kind==2:
-                              flags,q=uleb(b,q); mn,q=uleb(b,q); mx=None
-                              if flags&1: mx,q=uleb(b,q)
-                              imp.append((mn,mx,flags))
-                          elif kind==3: q+=2
-                          elif kind==4: _,q=uleb(b,q); _,q=uleb(b,q)
-                  elif sid==5:
-                      count,q=uleb(b,p)
-                      for _ in range(count):
-                          flags,q=uleb(b,q); mn,q=uleb(b,q); mx=None
-                          if flags&1: mx,q=uleb(b,q)
-                          out.append((mn,mx,flags))
-                  p=end
-              vals=imp+out; assert len(vals)==1
-              mn,mx,flags=vals[0]
-              return mn*65536, None if mx is None else mx*65536, flags
-          expected={'runtime/rebirth384/boxedwine.wasm':402653184,
-                    'runtime/rebirth256/boxedwine.wasm':268435456}
-          for path,want in expected.items():
-              initial,maximum,flags=memory(path)
-              print(path, 'initial=',initial,'maximum=',maximum,'flags=',flags)
-              assert initial==want
-              assert maximum==want
-          for d in ('runtime/rebirth384','runtime/rebirth256'):
-              js=Path(d+'/boxedwine.js').read_text(errors='replace')
-              assert 'PThread' not in js
-              assert 'SharedArrayBuffer' not in js
-              print(d, 'js=',Path(d+'/boxedwine.js').stat().st_size,'wasm=',Path(d+'/boxedwine.wasm').stat().st_size)
+          p=8; memories=[]; imported=[]
+          while p<len(b):
+              sid=b[p]; p+=1; n,p=uleb(p); end=p+n
+              if sid==2:
+                  count,q=uleb(p)
+                  for _ in range(count):
+                      ln,q=uleb(q); mod=b[q:q+ln].decode('utf8','replace'); q+=ln
+                      ln,q=uleb(q); name=b[q:q+ln].decode('utf8','replace'); q+=ln
+                      kind=b[q]; q+=1
+                      if kind==0: _,q=uleb(q)
+                      elif kind==1:
+                          q+=1; flags,q=uleb(q); _,q=uleb(q)
+                          if flags&1: _,q=uleb(q)
+                      elif kind==2:
+                          flags,q=uleb(q); mn,q=uleb(q); mx=None
+                          if flags&1: mx,q=uleb(q)
+                          imported.append((mod,name,mn,mx,flags))
+                      elif kind==3: q+=2
+                      elif kind==4: _,q=uleb(q); _,q=uleb(q)
+              elif sid==5:
+                  count,q=uleb(p)
+                  for _ in range(count):
+                      flags,q=uleb(q); mn,q=uleb(q); mx=None
+                      if flags&1: mx,q=uleb(q)
+                      memories.append((mn,mx,flags))
+              p=end
+          vals=[('import',)+x for x in imported]+[('defined','', '',)+x for x in memories]
+          print('Imported memories:', imported)
+          print('Defined memories:', memories)
+          assert len(imported)+len(memories)==1
+          if imported:
+              _,_,mn,mx,flags=imported[0]
+          else:
+              mn,mx,flags=memories[0]
+          initial=mn*65536; maximum=None if mx is None else mx*65536
+          print('initial bytes=',initial,'maximum bytes=',maximum,'flags=',flags)
+          assert initial == 402653184
+          assert maximum == 402653184
+          assert flags & 2 == 0, 'WASM memory is shared; iPhone Preview would require cross-origin isolation'
+          js=JS.read_text(errors='replace')
+          assert 'wasmBinary' in js
+          print('boxedwine.js bytes=',JS.stat().st_size)
+          print('boxedwine.wasm bytes=',WASM.stat().st_size)
+          print('Worker constructor references=',js.count('new Worker'))
+          print('SharedArrayBuffer references=',js.count('SharedArrayBuffer'))
           PY
-          printf 'Built from dano​on2/Boxedwine release/25R1 using emscripten/emsdk:4.0.16. Only WebAssembly INITIAL_MEMORY changed from the upstream fixed 512 MiB setting.\n384 MiB = 402653184 bytes.\n' > runtime/rebirth384/SOURCE.txt
-          printf 'Built from dano​on2/Boxedwine release/25R1 using emscripten/emsdk:4.0.16. Only WebAssembly INITIAL_MEMORY changed from the upstream fixed 512 MiB setting.\n256 MiB = 268435456 bytes.\n' > runtime/rebirth256/SOURCE.txt
+          printf 'ReBirth-specific BoxedWine 25R1 web engine. Source: dano​on2/Boxedwine release/25R1. Built with emscripten/emsdk:4.0.16. Upstream fixed 512 MiB WebAssembly memory changed only to fixed 384 MiB (402653184 bytes). WASM memory verified non-shared.\n' > runtime/rebirth384/SOURCE.txt
 
-      - name: Commit custom runtime variants
+      - name: Commit custom runtime
         shell: bash
         run: |
           set -euxo pipefail
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add runtime/rebirth384 runtime/rebirth256
+          git add runtime/rebirth384
           git diff --cached --stat
-          git commit -m 'Add ReBirth-specific lower-memory BoxedWine 25R1 runtimes'
+          git commit -m 'Add verified 384 MiB ReBirth BoxedWine 25R1 runtime'
           git push origin HEAD:boxedwine-runtime
