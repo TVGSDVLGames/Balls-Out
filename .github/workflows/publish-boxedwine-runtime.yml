@@ -61,6 +61,72 @@ jobs:
           echo '=== Wine audio-related matches ==='
           grep -Ei '(wineoss|winealsa|winepulse|winecoreaudio|mmdevapi|winebus|alsa|pulse|oss|audio|dsound|winmm)' /tmp/root-list.txt | head -200 || true
 
+      - name: Audit browser engine sidecars and WASM memory
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo '=== worker / shared-memory references ==='
+          if grep -En 'PThread|SharedArrayBuffer|new Worker|worker\\.js|importScripts|Atomics\\.' runtime/boxedwine.js; then
+            echo 'Unexpected worker/shared-memory dependency found'
+            exit 1
+          else
+            echo 'No pthread/worker/shared-memory sidecar dependency found'
+          fi
+          echo '=== other possible generated sidecars ==='
+          grep -Eo "[A-Za-z0-9_.-]+\\.(data|mem|worker\\.js|wasm)" runtime/boxedwine.js | sort -u || true
+          python3 - <<'PY'
+          from pathlib import Path
+          b = Path('runtime/boxedwine.wasm').read_bytes()
+          assert b[:4] == b'\\0asm' and b[4:8] == b'\\x01\\x00\\x00\\x00'
+          p = 8
+          def uleb(i):
+              v = 0; sh = 0
+              while True:
+                  x = b[i]; i += 1
+                  v |= (x & 0x7f) << sh
+                  if not (x & 0x80): return v, i
+                  sh += 7
+          memories=[]
+          imports=[]
+          while p < len(b):
+              sid=b[p]; p+=1
+              n,p=uleb(p); end=p+n
+              if sid==2:  # imports
+                  count,p2=uleb(p)
+                  for _ in range(count):
+                      ln,p2=uleb(p2); mod=b[p2:p2+ln].decode('utf8','replace'); p2+=ln
+                      ln,p2=uleb(p2); name=b[p2:p2+ln].decode('utf8','replace'); p2+=ln
+                      kind=b[p2]; p2+=1
+                      if kind==0: _,p2=uleb(p2)
+                      elif kind==1:
+                          p2 += 1
+                          flags,p2=uleb(p2); _,p2=uleb(p2)
+                          if flags & 1: _,p2=uleb(p2)
+                      elif kind==2:
+                          flags,p2=uleb(p2); mn,p2=uleb(p2); mx=None
+                          if flags & 1: mx,p2=uleb(p2)
+                          imports.append((mod,name,mn,mx,flags))
+                      elif kind==3:
+                          p2 += 2
+                      elif kind==4:
+                          _,p2=uleb(p2); _,p2=uleb(p2)
+              elif sid==5:  # memory section
+                  count,p2=uleb(p)
+                  for _ in range(count):
+                      flags,p2=uleb(p2); mn,p2=uleb(p2); mx=None
+                      if flags & 1: mx,p2=uleb(p2)
+                      memories.append((mn,mx,flags))
+              p=end
+          print('Imported memories:', imports)
+          print('Defined memories:', memories)
+          assert len(imports)+len(memories) == 1, 'Expected exactly one WebAssembly memory'
+          mem=(imports+memories)[0]
+          mn=mem[2] if imports else mem[0]
+          mx=mem[3] if imports else mem[1]
+          print('Initial memory pages:', mn, 'bytes:', mn*65536, 'MiB:', mn*65536/1048576)
+          print('Maximum memory pages:', mx, 'bytes:', None if mx is None else mx*65536, 'MiB:', None if mx is None else mx*65536/1048576)
+          PY
+
       - name: Commit runtime files to this branch only
         shell: bash
         run: |
