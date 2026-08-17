@@ -46,6 +46,18 @@ jobs:
           cp -a "$WEB_DIR"/. runtime/
           printf 'Official BoxedWine 25R1 web runtime. Source: dano​on2/Boxedwine release 25R1.0\nSHA256 release ZIP: b10e46bbe8b236d9b8088b3cf8a63d285154763c07d2fc4acb26999e10ad8f7d\n' > runtime/SOURCE.txt
 
+      - name: Audit Wine files needed by ReBirth
+        shell: bash
+        run: |
+          set -euxo pipefail
+          unzip -l runtime/boxedwine.zip > /tmp/root-list.txt
+          for DLL in kernel32 user32 msvcrt version winmm dsound; do
+            echo "=== $DLL ==="
+            grep -Ei "(^|/)$DLL(\\.dll|\\.dll\\.so)(/|$)" /tmp/root-list.txt | head -20
+            grep -Eqi "(^|/)$DLL(\\.dll|\\.dll\\.so)(/|$)" /tmp/root-list.txt
+          done
+          grep -Ei '(/|^)wineboot$|(/|^)wineserver$|(/|^)wine$' /tmp/root-list.txt | head -50
+
       - name: Commit runtime files to this branch only
         shell: bash
         run: |
@@ -76,6 +88,8 @@ jobs:
             test "$OK" = 1
             echo "$FILE bytes: $(wc -c < "/tmp/${FILE}.check")"
             grep -i '^access-control-allow-origin:' "/tmp/${FILE}.headers"
+            grep -i '^content-type:' "/tmp/${FILE}.headers" || true
+            grep -i '^x-content-type-options:' "/tmp/${FILE}.headers" || true
           done
           test "$(wc -c < /tmp/boxedwine.wasm.check)" -eq 2303715
           test "$(wc -c < /tmp/boxedwine.zip.check)" -eq 37247698
