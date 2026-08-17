@@ -1,0 +1,1 @@
+ReBirth-specific BoxedWine 25R1 web engine. Source: dano​on2/Boxedwine release/25R1. Built with emscripten/emsdk:4.0.16. Upstream fixed 512 MiB WebAssembly memory changed only to fixed 384 MiB (402653184 bytes). WASM memory verified non-shared.
