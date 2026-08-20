@@ -1,0 +1,35 @@
+name: Fetch Real Human Assets
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/fetch-real-human.yml'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Vitruvian CC0 digital human
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --depth 1 https://github.com/ibrews/VitruvianGodot.git vit
+          mkdir -p real-human
+          cp vit/godot_project/vitruvian_body.glb real-human/
+          cp vit/godot_project/vitruvian_head.glb real-human/
+          if [ -f vit/godot_project/vitruvian_hair_rigged.glb ]; then cp vit/godot_project/vitruvian_hair_rigged.glb real-human/; fi
+          cp vit/godot_project/vit_body_bc.png real-human/
+          cp vit/godot_project/vit_body_n.png real-human/
+          cp vit/godot_project/vit_body_rough.png real-human/
+          cp vit/godot_project/vit_face_bc.png real-human/
+          cp vit/godot_project/vit_face_n.png real-human/
+          cp vit/godot_project/vit_face_rough.png real-human/
+          cp vit/NOTICE.md real-human/NOTICE_VITRUVIAN.md || true
+          ls -lh real-human
+      - name: Upload real human
+        uses: actions/upload-artifact@v4
+        with:
+          name: balls-out-real-human
+          path: real-human
+          compression-level: 0
