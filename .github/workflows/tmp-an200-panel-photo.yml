@@ -1,0 +1,28 @@
+name: TEMP AN200 real panel photo
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch calibrated real AN200 photograph
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          URL='https://medias.audiofanzine.com/images/normal/yamaha-an200-6398712.png'
+          curl -fL --retry 4 --retry-delay 2 -A 'Mozilla/5.0' "$URL" -o out/AN200_REAL_PANEL_PHOTO.png
+          test $(wc -c < out/AN200_REAL_PANEL_PHOTO.png) -gt 20000
+          file out/AN200_REAL_PANEL_PHOTO.png | tee out/file.txt
+          printf '%s\n' "$URL" > out/AN200_REAL_PANEL_PHOTO.source.txt
+          sha256sum out/AN200_REAL_PANEL_PHOTO.png | tee out/sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AN200_REAL_PANEL_PHOTO
+          path: out/
+          retention-days: 1
+          if-no-files-found: error
