@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y blender >/dev/null
+          sudo apt-get install -y blender python3-numpy >/dev/null
           cat > /tmp/static_head.py <<'PY'
           import bpy
           src = 'vit/godot_project/vitruvian_head.glb'
@@ -56,6 +56,7 @@ jobs:
           print('WROTE', dst)
           PY
           blender -b --python /tmp/static_head.py
+          test -s real-human/vitruvian_head_static.glb
           ls -lh real-human
       - name: Upload real human
         uses: actions/upload-artifact@v4
