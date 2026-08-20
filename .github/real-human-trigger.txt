@@ -1,1 +1,1 @@
-Fetch Vitruvian human asset package for Balls Out p58 — static-head compatibility bake.
+Fetch Vitruvian human asset package for Balls Out p58 — static-head compatibility bake v2.
