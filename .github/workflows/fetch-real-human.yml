@@ -31,6 +31,31 @@ jobs:
           cp vit/godot_project/vit_face_n.png real-human/
           cp vit/godot_project/vit_face_rough.png real-human/
           cp vit/NOTICE.md real-human/NOTICE_VITRUVIAN.md || true
+      - name: Bake Godot-4.2-compatible static head
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y blender >/dev/null
+          cat > /tmp/static_head.py <<'PY'
+          import bpy
+          src = 'vit/godot_project/vitruvian_head.glb'
+          dst = 'real-human/vitruvian_head_static.glb'
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          bpy.ops.import_scene.gltf(filepath=src)
+          for obj in list(bpy.context.scene.objects):
+              if obj.type == 'MESH' and obj.data.shape_keys:
+                  bpy.context.view_layer.objects.active = obj
+                  obj.select_set(True)
+                  try:
+                      bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
+                  except Exception:
+                      pass
+                  obj.select_set(False)
+          bpy.ops.export_scene.gltf(filepath=dst, export_format='GLB', export_apply=True)
+          print('WROTE', dst)
+          PY
+          blender -b --python /tmp/static_head.py
           ls -lh real-human
       - name: Upload real human
         uses: actions/upload-artifact@v4
