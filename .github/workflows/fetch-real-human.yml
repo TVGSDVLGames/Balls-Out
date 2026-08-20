@@ -45,13 +45,7 @@ jobs:
           bpy.ops.import_scene.gltf(filepath=src)
           for obj in list(bpy.context.scene.objects):
               if obj.type == 'MESH' and obj.data.shape_keys:
-                  bpy.context.view_layer.objects.active = obj
-                  obj.select_set(True)
-                  try:
-                      bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
-                  except Exception:
-                      pass
-                  obj.select_set(False)
+                  obj.shape_key_clear()
           bpy.ops.export_scene.gltf(filepath=dst, export_format='GLB', export_apply=True)
           print('WROTE', dst)
           PY
