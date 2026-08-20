@@ -4,6 +4,11 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/fetch-real-human.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/real-human-trigger.txt'
+      - '.github/workflows/fetch-real-human.yml'
   workflow_dispatch:
 
 jobs:
