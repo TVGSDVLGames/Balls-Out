@@ -1,0 +1,72 @@
+name: TEMP AN200 OS 1.03 extraction
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  RAR_URL: https://www.alexanderpeppe.com/eprom/Yamaha%20AN200%20-%201.03.rar
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show available archive tools
+        run: |
+          uname -a
+          command -v 7z || true
+          command -v 7zz || true
+          command -v unrar || true
+
+      - name: Download preserved AN200 archive
+        run: |
+          curl -fL --retry 3 --retry-delay 2 "$RAR_URL" -o AN2_V103.mid.rar
+          stat -c 'archive_size=%s' AN2_V103.mid.rar
+          sha256sum AN2_V103.mid.rar
+          file AN2_V103.mid.rar
+
+      - name: Extract solid RAR
+        run: |
+          mkdir -p extracted
+          if command -v 7z >/dev/null 2>&1; then
+            7z t AN2_V103.mid.rar
+            7z x -y AN2_V103.mid.rar AN2_V103.mid -oextracted
+          elif command -v unrar >/dev/null 2>&1; then
+            unrar t -idq AN2_V103.mid.rar
+            unrar x -o+ -idq AN2_V103.mid.rar AN2_V103.mid extracted/
+          else
+            sudo apt-get update
+            sudo apt-get install -y unrar
+            unrar t -idq AN2_V103.mid.rar
+            unrar x -o+ -idq AN2_V103.mid.rar AN2_V103.mid extracted/
+          fi
+          test -f extracted/AN2_V103.mid
+
+      - name: Strictly validate extracted updater
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zlib, json
+          p=Path('extracted/AN2_V103.mid')
+          b=p.read_bytes()
+          size=len(b); crc=zlib.crc32(b)&0xffffffff; sha=hashlib.sha256(b).hexdigest()
+          print(f'size={size}')
+          print(f'crc32={crc:08X}')
+          print(f'sha256={sha}')
+          if size != 1220214 or crc != 0x61D019A6:
+              raise SystemExit('STRICT VALIDATION FAILED')
+          Path('extracted/VALIDATION.json').write_text(json.dumps({'size':size,'crc32':f'{crc:08X}','sha256':sha,'validation':'PASS'},indent=2)+'\n')
+          print('STRICT VALIDATION PASS')
+          PY
+
+      - name: Upload exact updater artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AN200_OS103_EXTRACTED
+          path: extracted/
+          if-no-files-found: error
+          retention-days: 7
