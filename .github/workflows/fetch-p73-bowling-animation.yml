@@ -26,7 +26,8 @@ jobs:
             'https://github.com/godotengine/FBX2glTF/releases/download/v0.13.1/FBX2glTF-linux-x86_64.zip' \
             -o converter/fbx2gltf.zip
           unzip -q converter/fbx2gltf.zip -d converter/bin
-          BIN="$(find converter/bin -type f -name 'FBX2glTF*' | head -n 1)"
+          BIN="$(find converter/bin -type f -name 'FBX2glTF' | head -n 1)"
+          test -n "$BIN"
           chmod +x "$BIN"
           "$BIN" --version || true
           "$BIN" --binary --anim-framerate bake30 --skinning-weights 4 \
