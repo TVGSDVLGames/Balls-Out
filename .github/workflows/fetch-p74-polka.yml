@@ -1,0 +1,39 @@
+name: Fetch p74 Public Domain Polka
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/p74-polka-trigger.txt'
+      - '.github/workflows/fetch-p74-polka.yml'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch worldwide-public-domain Pizzicato-Polka recording
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p p74-music
+          curl -L --fail --retry 3 --retry-delay 2 \
+            'https://pool.publicdomainproject.org/audio/ogg/genres/dance_music/polka/staatskapelle_berlin/polydor-15319a-1421gs.ogg' \
+            -o p74-music/pizzicato_polka_pd.ogg
+          test -s p74-music/pizzicato_polka_pd.ogg
+          file p74-music/pizzicato_polka_pd.ogg
+          cat > p74-music/SOURCE.txt <<'EOF'
+          Pizzicato-Polka
+          Johann Strauss II / Josef Strauss
+          Orchestra of the Staatsoper Berlin, Alois Melichar
+          Recorded 17 February 1940; Polydor 15319a / 1421gs
+          Source: Public Domain Project MediPool
+          Source record: https://pool.publicdomainproject.org/index.php?title=Polydor-15319a-1421gs
+          Status on source record: public domain worldwide (PD CH 1992 / PD EU 2012 / PD USA 1992 / PD INT 2012)
+          EOF
+      - name: Upload music asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: balls-out-p74-polka
+          path: p74-music
+          compression-level: 0
+          retention-days: 1
