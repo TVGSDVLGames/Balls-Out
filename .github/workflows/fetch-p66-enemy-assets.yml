@@ -19,12 +19,17 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          git clone --depth 1 https://github.com/Seyamalam/blood-league-kickoff.git src
+          git clone --depth 1 https://github.com/Seyamalam/blood-league-kickoff.git src_anim
+          git clone --depth 1 https://github.com/agentkaerf/FreeModels.git src_models
           mkdir -p p66-assets/quaternius
-          cp src/public/assets/vendor/quaternius/night-striker.glb p66-assets/quaternius/
-          cp src/public/assets/vendor/quaternius/universal-animation-library.glb p66-assets/quaternius/
-          cp src/public/assets/vendor/quaternius/LICENSE-ANIMATIONS.txt p66-assets/quaternius/
-          cp src/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt p66-assets/quaternius/
+          cp src_anim/public/assets/vendor/quaternius/universal-animation-library.glb p66-assets/quaternius/
+          cp src_anim/public/assets/vendor/quaternius/LICENSE-ANIMATIONS.txt p66-assets/quaternius/
+          base='src_models/Ultimate Modular Men- Feb 2022/Individual Characters/glTF'
+          cp "$base/Casual_Hoodie.gltf" p66-assets/quaternius/
+          cp "$base/Punk.gltf" p66-assets/quaternius/
+          cp "$base/Swat.gltf" p66-assets/quaternius/
+          cp "$base/Farmer.gltf" p66-assets/quaternius/
+          cp 'src_models/Ultimate Modular Men- Feb 2022/License.txt' p66-assets/quaternius/LICENSE-MODULAR-MEN.txt
           ls -lh p66-assets/quaternius
       - name: Upload p66 assets
         uses: actions/upload-artifact@v4
