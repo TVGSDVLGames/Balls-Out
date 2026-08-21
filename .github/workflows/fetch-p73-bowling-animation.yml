@@ -4,6 +4,10 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/fetch-p73-bowling-animation.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/p73-bowling-trigger.txt'
   workflow_dispatch:
 
 jobs:
@@ -42,7 +46,7 @@ jobs:
               if typ == 0x4E4F534A:
                   j = json.loads(chunk.decode('utf-8').rstrip('\x00 '))
           print('GLB animations:', [a.get('name','') for a in j.get('animations',[])])
-          print('GLB nodes:', [n.get('name','') for n in j.get('nodes',[])][:120])
+          print('GLB nodes:', [n.get('name','') for n in j.get('nodes',[])][:160])
           pathlib.Path('p73-assets/bowling/SOURCE.txt').write_text(
               'Source: https://github.com/trundlr/sbox-sports\n'
               'Asset: models/SportsCitizen/Animations/Bowling/Citizen_Bowling_Poses.fbx\n'
