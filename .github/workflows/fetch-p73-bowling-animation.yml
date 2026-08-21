@@ -12,7 +12,7 @@ on:
 
 jobs:
   convert:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Fetch authored bowling FBX and convert to GLB
         shell: bash
