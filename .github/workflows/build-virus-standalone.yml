@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: virus-standalone-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -21,7 +25,7 @@ jobs:
 
       - name: Clone Gearmulator 2.2.9
         run: |
-          git clone --recursive --depth 1 --branch 2.2.9 \
+          git clone --recursive --shallow-submodules --depth 1 --jobs 8 --branch 2.2.9 \
             https://github.com/dsp56300/gearmulator.git gearmulator
 
       - name: Configure Osirus standalone only
