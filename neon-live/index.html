@@ -7,26 +7,33 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Neon Millipede</title>
 <style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02020a;color:#dff;font-family:system-ui,-apple-system,sans-serif;touch-action:none;overscroll-behavior:none}body{display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,#1b0b3c 0,#050611 48%,#010104 100%)}#shell{position:relative;width:min(100vw,60vh);height:min(100vh,166.6667vw);max-width:768px;max-height:1280px;aspect-ratio:3/5;background:#000;box-shadow:0 0 28px #00eaff55,0 0 90px #ff00bb33}canvas{display:block;width:100%;height:100%;outline:0;background:#000;touch-action:none}#gate{position:absolute;inset:0;z-index:5;display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 38%,#220c47ee,#02020afb 68%)}#card{width:min(88%,520px)}h1{margin:0 0 9px;font-size:clamp(30px,9vw,62px);line-height:.92;letter-spacing:.055em;color:#cfffff;text-shadow:0 0 8px #0ff,0 0 24px #0ff,4px 3px 0 #f09}p{margin:14px auto;color:#a9bed8;line-height:1.42;font-size:13px}button{margin-top:14px;border:2px solid #65f9ff;border-radius:999px;background:#09162c;color:#fff;padding:17px 32px;font-size:19px;font-weight:850;letter-spacing:.03em;box-shadow:0 0 18px #00eaff88,inset 0 0 22px #008cff35}button:active{transform:scale(.97)}button:disabled{opacity:.65}#bar{height:8px;border:1px solid #59eaff66;margin-top:19px;background:#001018;overflow:hidden;border-radius:8px}#fill{height:100%;width:0;background:linear-gradient(90deg,#00f0ff,#944cff,#ff28b8,#ffe05d);box-shadow:0 0 16px #0ff;transition:width .12s}#status{min-height:2.8em;margin-top:10px;color:#d3e4ff;font-size:12px}.small{font-size:10px;color:#6786a3;margin-top:12px;letter-spacing:.04em}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02020a;color:#dff;font-family:system-ui,-apple-system,sans-serif;touch-action:none;overscroll-behavior:none}body{display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,#1b0b3c 0,#050611 48%,#010104 100%)}
+#shell{position:relative;width:min(100vw,75vh);height:min(100vh,133.3333vw);max-width:768px;max-height:1024px;aspect-ratio:3/4;background:#000;box-shadow:0 0 28px #00eaff55,0 0 90px #ff00bb33}
+html.mobile-ui #shell{width:min(100vw,60vh);height:min(100vh,166.6667vw);max-width:768px;max-height:1280px;aspect-ratio:3/5}
+canvas{display:block;width:100%;height:100%;outline:0;background:#000;touch-action:none}#gate{position:absolute;inset:0;z-index:5;display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 38%,#220c47ee,#02020afb 68%)}#card{width:min(88%,520px)}h1{margin:0 0 9px;font-size:clamp(30px,9vw,62px);line-height:.92;letter-spacing:.055em;color:#cfffff;text-shadow:0 0 8px #0ff,0 0 24px #0ff,4px 3px 0 #f09}p{margin:14px auto;color:#a9bed8;line-height:1.42;font-size:13px}button{margin-top:14px;border:2px solid #65f9ff;border-radius:999px;background:#09162c;color:#fff;padding:17px 32px;font-size:19px;font-weight:850;letter-spacing:.03em;box-shadow:0 0 18px #00eaff88,inset 0 0 22px #008cff35}button:active{transform:scale(.97)}button:disabled{opacity:.65}#bar{height:8px;border:1px solid #59eaff66;margin-top:19px;background:#001018;overflow:hidden;border-radius:8px}#fill{height:100%;width:0;background:linear-gradient(90deg,#00f0ff,#944cff,#ff28b8,#ffe05d);box-shadow:0 0 16px #0ff;transition:width .12s}#status{min-height:2.8em;margin-top:10px;color:#d3e4ff;font-size:12px}.small{font-size:10px;color:#6786a3;margin-top:12px;letter-spacing:.04em}
 </style>
-<script src="../web/index.js?v=6"></script>
+<script src="../web/index.js?v=7"></script>
 </head>
 <body>
 <div id="shell">
-<canvas id="canvas" width="768" height="1280" tabindex="0">Your browser does not support canvas.</canvas>
+<canvas id="canvas" width="768" height="1024" tabindex="0">Your browser does not support canvas.</canvas>
 <div id="gate"><div id="card">
 <h1>NEON<br>MILLIPEDE</h1>
 <p>Arcade-source gameplay buried under completely unreasonable neon.</p>
 <button id="launch">TAP TO PLAY</button>
 <div id="bar"><div id="fill"></div></div>
-<div id="status">Ready — build 6 strict mobile controls.</div>
+<div id="status">Ready — build 7 adaptive desktop/mobile layout.</div>
 <div class="small">CONTROLLER • TOUCH • KEYBOARD • DYNAMIC AUDIO</div>
 </div></div>
 </div>
 <script>
 (()=>{
-// strict-mobile-input-build-6
+// adaptive-layout-build-7: desktop 3:4, mobile 3:5 with dedicated controls dock
 const launch=document.getElementById('launch'),status=document.getElementById('status'),fill=document.getElementById('fill'),gate=document.getElementById('gate'),canvas=document.getElementById('canvas');
+const mobileUI=(navigator.maxTouchPoints||0)>0 && window.matchMedia('(pointer: coarse)').matches;
+document.documentElement.classList.toggle('mobile-ui',mobileUI);
+canvas.width=768;
+canvas.height=mobileUI?1280:1024;
 let starting=false;
 function msg(s,p){status.textContent=s;if(p!=null)fill.style.width=Math.max(0,Math.min(100,p))+'%'}
 async function boot(){
@@ -35,13 +42,13 @@ async function boot(){
  try{
   if(typeof Engine==='undefined')throw new Error('Godot Web engine did not load.');
   msg('Loading game pack…',8);
-  const r=await fetch('./neon.pck?v=6',{cache:'no-store'});
+  const r=await fetch('./neon.pck?v=7',{cache:'no-store'});
   if(!r.ok)throw new Error(`Game pack HTTP ${r.status}`);
   const pack=await r.arrayBuffer();
   if(pack.byteLength<100000)throw new Error(`Game pack truncated: only ${pack.byteLength} bytes`);
   const h=new Uint8Array(pack,0,4);
   if(h[0]!==0x47||h[1]!==0x44||h[2]!==0x50||h[3]!==0x43)throw new Error('Game pack header is invalid.');
-  msg('Starting Godot 4.7.1…',35);
+  msg(`Starting Godot 4.7.1 — ${mobileUI?'mobile controls':'full 3:4 arcade view'}…`,35);
   const engine=new Engine({executable:'../web/index',canvas,canvasResizePolicy:2,focusCanvas:true,onProgress:(c,t)=>{if(t)msg('Loading engine…',35+Math.round(c/t*58))},onPrint:(...a)=>console.log('[Godot]',...a),onPrintError:(...a)=>console.error('[Godot]',...a)});
   await Promise.all([engine.init('../web/index'),engine.preloadFile(pack,'neon.pck')]);
   msg('Launching…',96);
