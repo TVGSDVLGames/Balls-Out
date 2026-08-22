@@ -27,20 +27,34 @@ jobs:
           git clone --recursive --depth 1 --shallow-submodules \
             https://github.com/dsp56300/dsp56300.git dsp56300
 
-      - name: Make upstream CMake Emscripten-safe
+      - name: Make upstream core Emscripten-safe
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p=Path('dsp56300/source/CMakeLists.txt')
           s=p.read_text()
           s=s.replace('if(WIN32 OR (UNIX AND NOT APPLE))\n\tadd_subdirectory(vtuneSdk)', 'if((WIN32 OR (UNIX AND NOT APPLE)) AND NOT EMSCRIPTEN)\n\tadd_subdirectory(vtuneSdk)')
           p.write_text(s)
+
           p=Path('dsp56300/source/dsp56kEmu/CMakeLists.txt')
           s=p.read_text()
           s=s.replace('if(WIN32 OR (UNIX AND NOT APPLE))\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)', 'if((WIN32 OR (UNIX AND NOT APPLE)) AND NOT EMSCRIPTEN)\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)')
           s=s.replace('if(UNIX AND NOT APPLE)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 'if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)')
           p.write_text(s)
+
+          # AsmJit is compiled by upstream even though DSP g_jitSupported=false on
+          # wasm. Its cache-flush builtin lowers to llvm.clear_cache, which WebAssembly
+          # intentionally does not provide. Make it a no-op for Emscripten; the native
+          # JIT path cannot be selected by the DSP on this target anyway.
+          p=Path('dsp56300/source/asmjit/src/asmjit/core/virtmem.cpp')
+          s=p.read_text()
+          old='void flushInstructionCache(void* p, size_t size) noexcept {\n#if ASMJIT_ARCH_X86'
+          new='void flushInstructionCache(void* p, size_t size) noexcept {\n#if defined(__EMSCRIPTEN__)\n  DebugUtils::unused(p, size);\n#elif ASMJIT_ARCH_X86'
+          if old not in s:
+              raise SystemExit('AsmJit flushInstructionCache pattern changed')
+          p.write_text(s.replace(old,new,1))
           PY
 
       - name: Configure WASM build
