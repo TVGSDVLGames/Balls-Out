@@ -66,14 +66,32 @@ jobs:
           p.write_text(s.replace(old,new,1))
 
           # Emulator library: same GCC-only constexpr flag, plus native-only
-          # VTune/perf/thread integration. The DSP itself selects interpreter
-          # mode automatically because g_jitSupported=false on WebAssembly.
+          # VTune/perf/thread integration.
           p=Path('dsp56300/source/dsp56kEmu/CMakeLists.txt')
           s=p.read_text()
           s=s.replace('if(WIN32 OR (UNIX AND NOT APPLE))\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)', 'if((WIN32 OR (UNIX AND NOT APPLE)) AND NOT EMSCRIPTEN)\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)', 1)
           s=s.replace('elseif(UNIX AND NOT APPLE)', 'elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)', 1)
           s=s.replace('if(UNIX AND NOT APPLE)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 'if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 1)
           p.write_text(s)
+
+          # Upstream has no third JIT architecture state. On an unknown host CPU,
+          # jittypes.h falls back to x86 while several other files fall back to ARM.
+          # For Emscripten only, make the dead JIT code compile consistently as x86.
+          # dspconfig.h below separately guarantees the JIT can never execute.
+          p=Path('dsp56300/source/dsp56kBase/buildconfig.h')
+          s=p.read_text()
+          s += '\n#ifdef __EMSCRIPTEN__\n#ifndef HAVE_X86_64\n#define HAVE_X86_64 1\n#endif\n#endif\n'
+          p.write_text(s)
+
+          # Even with the compile-only x86 type shim above, WebAssembly must always
+          # run the real interpreter. Never permit AsmJit/native code execution.
+          p=Path('dsp56300/source/dsp56kEmu/dspconfig.h')
+          s=p.read_text()
+          old='#if defined(HAVE_X86_64) || defined(HAVE_ARM64)\n\tconstexpr bool g_jitSupported = true;\n#else\n\tconstexpr bool g_jitSupported = false;\n#endif'
+          new='#if defined(__EMSCRIPTEN__)\n\tconstexpr bool g_jitSupported = false;\n#elif defined(HAVE_X86_64) || defined(HAVE_ARM64)\n\tconstexpr bool g_jitSupported = true;\n#else\n\tconstexpr bool g_jitSupported = false;\n#endif'
+          if old not in s:
+              raise SystemExit('dspconfig JIT support pattern changed')
+          p.write_text(s.replace(old,new,1))
 
           # AsmJit is still compiled by upstream even though the DSP cannot use
           # it on WASM. Avoid Emscripten lowering __builtin___clear_cache to the
