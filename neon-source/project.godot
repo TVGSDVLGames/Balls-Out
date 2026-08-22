@@ -8,9 +8,9 @@ run/main_scene="res://main.tscn"
 
 [display]
 window/size/viewport_width=768
-window/size/viewport_height=1280
+window/size/viewport_height=1024
 window/size/window_width_override=768
-window/size/window_height_override=1280
+window/size/window_height_override=1024
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 window/handheld/orientation=1
@@ -53,7 +53,6 @@ restart_run={
 "events": [Object(InputEventKey,"physical_keycode":82), Object(InputEventJoypadButton,"button_index":3)]
 }
 
-
 ui_accept={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
@@ -65,3 +64,4 @@ ui_cancel={
 
 [input_devices]
 pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=false
