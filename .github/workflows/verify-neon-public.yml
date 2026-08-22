@@ -17,21 +17,24 @@ jobs:
           set -euxo pipefail
           BASE='https://raw.githack.com/TVGSDVLGames/Balls-Out/neon-millipede-public'
           for n in {1..18}; do
-            if curl -fLsS --max-time 30 "$BASE/neon-live/index.html?v=6" -o /tmp/index.html && grep -q 'build 6 strict mobile controls' /tmp/index.html; then break; fi
+            if curl -fLsS --max-time 30 "$BASE/neon-live/index.html?v=7" -o /tmp/index.html && grep -q 'build 7 adaptive desktop/mobile layout' /tmp/index.html; then break; fi
             sleep 5
           done
           grep -q 'NEON' /tmp/index.html
           grep -q 'TAP TO PLAY' /tmp/index.html
-          grep -q 'neon.pck?v=6' /tmp/index.html
-          curl -fLsS --max-time 60 "$BASE/web/index.js?v=6" -o /tmp/index.js
+          grep -q 'neon.pck?v=7' /tmp/index.html
+          grep -q 'aspect-ratio:3/4' /tmp/index.html
+          grep -q 'aspect-ratio:3/5' /tmp/index.html
+          grep -q 'canvas.height=mobileUI?1280:1024' /tmp/index.html
+          curl -fLsS --max-time 60 "$BASE/web/index.js?v=7" -o /tmp/index.js
           test -s /tmp/index.js
           curl -fLsS --max-time 180 "$BASE/web/index.wasm" -o /tmp/index.wasm
           test $(stat -c%s /tmp/index.wasm) -gt 30000000
-          curl -fLsS --max-time 60 "$BASE/neon-live/neon.pck?v=6" -o /tmp/neon.pck
+          curl -fLsS --max-time 60 "$BASE/neon-live/neon.pck?v=7" -o /tmp/neon.pck
           test $(stat -c%s /tmp/neon.pck) -gt 100000
           printf 'HEADER='; head -c4 /tmp/neon.pck | xxd -p
           test "$(head -c4 /tmp/neon.pck)" = 'GDPC'
-          curl -fLsS --max-time 30 "$BASE/neon-live/neon.pck.sha256?v=6" -o /tmp/neon.pck.sha256
+          curl -fLsS --max-time 30 "$BASE/neon-live/neon.pck.sha256?v=7" -o /tmp/neon.pck.sha256
           EXPECTED=$(awk '{print $1}' /tmp/neon.pck.sha256)
           echo "$EXPECTED  /tmp/neon.pck" | sha256sum -c -
-          echo "PUBLIC_URL=$BASE/neon-live/index.html?v=6"
+          echo "PUBLIC_URL=$BASE/neon-live/index.html?v=7"
