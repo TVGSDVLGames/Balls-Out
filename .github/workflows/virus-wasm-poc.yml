@@ -52,8 +52,18 @@ jobs:
           p=Path('dsp56300/source/dsp56kBase/dspassert.cpp')
           s=p.read_text()
           s=s.replace('#ifndef ANDROID\n#define SUPPORT_BACKTRACE', '#if !defined(ANDROID) && !defined(__EMSCRIPTEN__)\n#define SUPPORT_BACKTRACE', 1)
-          s=s.replace('#endif\n#endif\n\n#ifdef SUPPORT_BACKTRACE', '#endif\n#endif\n\n#ifdef SUPPORT_BACKTRACE', 1)
           p.write_text(s)
+
+          # Browser WASM has no Linux process/thread priority API or SYS_gettid.
+          # For this first single-threaded interpreter proof, priority changes are
+          # deliberately a successful no-op.
+          p=Path('dsp56300/source/dsp56kBase/threadtools.cpp')
+          s=p.read_text()
+          old='\tbool ThreadTools::setCurrentThreadPriority(ThreadPriority _priority)\n\t{\n#ifdef _WIN32'
+          new='\tbool ThreadTools::setCurrentThreadPriority(ThreadPriority _priority)\n\t{\n#ifdef __EMSCRIPTEN__\n\t\t(void)_priority;\n\t\treturn true;\n#elif defined(_WIN32)'
+          if old not in s:
+              raise SystemExit('ThreadTools priority pattern changed')
+          p.write_text(s.replace(old,new,1))
 
           # Emulator library: same GCC-only constexpr flag, plus native-only
           # VTune/perf/thread integration. The DSP itself selects interpreter
