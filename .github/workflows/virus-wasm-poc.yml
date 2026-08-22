@@ -47,6 +47,14 @@ jobs:
           s=s.replace('if(UNIX AND NOT APPLE)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 'if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 1)
           p.write_text(s)
 
+          # execinfo/backtrace is a native Unix diagnostic facility, unavailable
+          # in browser WASM. Assertions still throw with their normal message.
+          p=Path('dsp56300/source/dsp56kBase/dspassert.cpp')
+          s=p.read_text()
+          s=s.replace('#ifndef ANDROID\n#define SUPPORT_BACKTRACE', '#if !defined(ANDROID) && !defined(__EMSCRIPTEN__)\n#define SUPPORT_BACKTRACE', 1)
+          s=s.replace('#endif\n#endif\n\n#ifdef SUPPORT_BACKTRACE', '#endif\n#endif\n\n#ifdef SUPPORT_BACKTRACE', 1)
+          p.write_text(s)
+
           # Emulator library: same GCC-only constexpr flag, plus native-only
           # VTune/perf/thread integration. The DSP itself selects interpreter
           # mode automatically because g_jitSupported=false on WebAssembly.
