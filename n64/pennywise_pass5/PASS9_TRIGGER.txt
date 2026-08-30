@@ -1,0 +1,1 @@
+PASS9 character rebuild trigger
