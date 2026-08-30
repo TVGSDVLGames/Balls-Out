@@ -1,0 +1,172 @@
+name: Pennywise64 PASS9 character fix
+on:
+  push:
+    branches: [pennywise64-pass9-character-fix]
+    paths:
+      - 'n64/pennywise_pass5/**'
+      - '.github/workflows/pennywise64-pass9.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      N64_INST: /opt/libdragon
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget zip python3 python3-numpy blender libpng-dev zlib1g-dev pkg-config libegl1 libgl1 libglx-mesa0 libopengl0 xvfb imagemagick libasound2t64 libudev1 libx11-6 libxext6 libxrandr2 libxi6 libxcursor1 libxinerama1 libwayland-client0 libvulkan1 mesa-vulkan-drivers
+      - name: N64 compiler
+        run: |
+          wget -q https://github.com/DragonMinded/libdragon/releases/download/toolchain-continuous-prerelease/gcc-toolchain-mips64-x86_64.deb -O /tmp/n64tc.deb
+          sudo dpkg -i /tmp/n64tc.deb || sudo apt-get -f install -y
+      - name: libdragon preview
+        run: |
+          git clone --depth 1 --branch preview https://github.com/DragonMinded/libdragon.git /tmp/libdragon
+          cd /tmp/libdragon
+          sudo env N64_INST=/opt/libdragon make -j2 install-mk
+          env N64_INST=/opt/libdragon make -j2 libdragon tools
+          sudo env N64_INST=/opt/libdragon make -j2 install tools-install
+      - name: Tiny3D
+        run: |
+          git clone --depth 1 https://github.com/HailToDodongo/tiny3d.git /tmp/tiny3d
+          cd /tmp/tiny3d
+          env N64_INST=/opt/libdragon make -j2
+          sudo env N64_INST=/opt/libdragon make install
+          env N64_INST=/opt/libdragon make -C tools/gltf_importer -j2
+          sudo env N64_INST=/opt/libdragon make -C tools/gltf_importer install
+      - name: Source assets
+        run: |
+          mkdir -p /tmp/quaternius
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/night-striker.glb -O /tmp/quaternius/night-striker.glb
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt -O /tmp/quaternius/LICENSE.txt
+          test -s /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+      - name: Generate PASS9
+        run: |
+          cd n64/pennywise_pass5
+          python3 tools/make_pass9_source.py
+          test -s tools/build_assets_pass9.py
+          test -s src/main_pass9.c
+          test -s src/main_pass9_bossproof.c
+          grep -q '3.14159265f' src/main_pass9.c
+          grep -q 'EyeSocketL' tools/build_assets_pass9.py
+          grep -q 'TunicUpper' tools/build_assets_pass9.py
+          grep -q 'PENNYWISE64_PASS9' Makefile
+      - name: Blender PASS9 assets
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf assets generated && mkdir -p assets generated
+          blender --background --python tools/build_assets_pass9.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template-glb /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+          for f in pennywise sewer balloon slingshot grate; do test -s "generated/$f.glb"; cp "generated/$f.glb" assets/; done
+          for f in brick stone metal water cloth redcloth skin hair wood face; do test -s "generated/$f.png"; cp "generated/$f.png" assets/; done
+          test -s generated/PENNYWISE_PASS9_MODEL_PREVIEW.png
+      - name: Verify character rebuild
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          import struct,json
+          def glb(path):
+              b=open(path,'rb').read();o=12
+              while o<len(b):
+                  n,t=struct.unpack_from('<II',b,o);o+=8;d=b[o:o+n];o+=n
+                  if t==0x4e4f534a:return json.loads(d.rstrip(b' \0\r\n\t'))
+          p=glb('assets/pennywise.glb'); names=' '.join(x.get('name','') for x in p.get('nodes',[]))
+          for n in ('SuperHero_Male','PennyHead','EyeSocketL','EyeSocketR','EyeL','EyeR','Mouth','Teeth','TunicUpper','TunicLower','SleevePuffL','SleevePuffR','BloomerL','BloomerR'):
+              assert n in names,n
+          assert 'ShoulderPleatL' not in names
+          print('PASS9_PENNY_NODES',len(p.get('nodes',[])))
+          PY
+      - name: Build main ROM
+        run: |
+          cd n64/pennywise_pass5
+          export PATH=/opt/libdragon/bin:$PATH
+          make clean && make -j2
+          test -s PENNYWISE64_PASS9.z64
+          test $(find filesystem -name '*.sprite' | wc -l) -ge 10
+          python3 - <<'PY'
+          import hashlib
+          b=open('PENNYWISE64_PASS9.z64','rb').read()
+          assert b[:4]==bytes.fromhex('80371240')
+          assert 'PENNYWISE 64 P9' in b[0x20:0x34].decode('ascii','replace').rstrip('\0 ')
+          print(len(b),hashlib.sha256(b).hexdigest())
+          PY
+          cp PENNYWISE64_PASS9.z64 /tmp/PENNYWISE64_PASS9.z64
+      - name: Build boss capture ROM
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          s=open('Makefile').read().replace('BUILD_DIR=build','BUILD_DIR=build_boss',1).replace('src = src/main_pass9.c','src = src/main_pass9_bossproof.c',1).replace('PENNYWISE64_PASS9','PENNYWISE64_PASS9_BOSS').replace('PENNYWISE 64 P9','PENNYWISE 64 P9B')
+          open('Makefile.boss','w').write(s)
+          PY
+          export PATH=/opt/libdragon/bin:$PATH
+          make -f Makefile.boss -j2
+          test -s PENNYWISE64_PASS9_BOSS.z64
+      - name: Emulator
+        run: |
+          wget -q https://github.com/gopher64/gopher64/releases/download/v1.1.36/gopher64-linux-x86_64 -O /tmp/gopher64
+          chmod +x /tmp/gopher64
+          mkdir -p /tmp/gopher && cp /tmp/gopher64 /tmp/gopher/ && touch /tmp/gopher/portable.txt
+          cat >/tmp/asound.conf <<'EOF'
+          pcm.!default { type null }
+          ctl.!default { type null }
+          EOF
+      - name: Main emulator capture
+        run: |
+          cd n64/pennywise_pass5
+          export ALSA_CONFIG_PATH=/tmp/asound.conf SDL_AUDIODRIVER=dummy DISPLAY=:99
+          Xvfb :99 -screen 0 800x600x24 -nolisten tcp >/tmp/xvfb.log 2>&1 & X=$!; sleep 2
+          cd /tmp/gopher
+          timeout --signal=TERM --kill-after=2s 13s ./gopher64 "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS9.z64" >/tmp/gmain.log 2>&1 & E=$!; sleep 8
+          test -e /proc/$E/status
+          import -display :99 -window root "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS9_GOPHER64.png"
+          wait $E || true; kill $X 2>/dev/null || true
+          cd "$GITHUB_WORKSPACE/n64/pennywise_pass5"
+          tail -180 /tmp/gmain.log > PASS9_SMOKE_MAIN.txt || true
+          ! grep -Eqi 'assertion failed|assert failed|backtrace|panic|segmentation fault|not found' PASS9_SMOKE_MAIN.txt
+      - name: Boss emulator capture
+        run: |
+          cd n64/pennywise_pass5
+          export ALSA_CONFIG_PATH=/tmp/asound.conf SDL_AUDIODRIVER=dummy DISPLAY=:100
+          Xvfb :100 -screen 0 800x600x24 -nolisten tcp >/tmp/xvfb2.log 2>&1 & X=$!; sleep 2
+          cd /tmp/gopher
+          timeout --signal=TERM --kill-after=2s 13s ./gopher64 "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS9_BOSS.z64" >/tmp/gboss.log 2>&1 & E=$!; sleep 8
+          test -e /proc/$E/status
+          import -display :100 -window root "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS9_BOSS_GOPHER64.png"
+          wait $E || true; kill $X 2>/dev/null || true
+          cd "$GITHUB_WORKSPACE/n64/pennywise_pass5"
+          tail -180 /tmp/gboss.log > PASS9_SMOKE_BOSS.txt || true
+          ! grep -Eqi 'assertion failed|assert failed|backtrace|panic|segmentation fault|not found' PASS9_SMOKE_BOSS.txt
+      - name: Package
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf dist && mkdir -p dist/source dist/textures
+          cp /tmp/PENNYWISE64_PASS9.z64 dist/
+          cp PENNYWISE64_PASS9_GOPHER64.png PENNYWISE64_PASS9_BOSS_GOPHER64.png generated/PENNYWISE_PASS9_MODEL_PREVIEW.png dist/
+          cp PASS9_SMOKE_MAIN.txt PASS9_SMOKE_BOSS.txt dist/
+          cp generated/pennywise_pass9.blend generated/sewer_pass9.blend dist/
+          cp assets/*.glb dist/; cp assets/*.png dist/textures/
+          cp Makefile src/main_pass9.c src/main_pass9_bossproof.c tools/build_assets_pass9.py tools/make_pass9_source.py tools/pass7_materials.py dist/source/
+          cp /tmp/quaternius/LICENSE.txt dist/QUATERNIUS_CC0_LICENSE.txt
+          sha256sum dist/PENNYWISE64_PASS9.z64 > dist/PASS9_SHA256.txt
+          (cd dist && zip -r ../Pennywise64_PASS9_CHARACTER_FIX.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS9-CHARACTER-FIX
+          path: |
+            n64/pennywise_pass5/dist/**
+            n64/pennywise_pass5/Pennywise64_PASS9_CHARACTER_FIX.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Pennywise64-PASS9-diagnostics
+          path: |
+            n64/pennywise_pass5/generated/**
+            n64/pennywise_pass5/assets/**
+            n64/pennywise_pass5/*.png
+            n64/pennywise_pass5/PASS9_*.txt
+          if-no-files-found: ignore
