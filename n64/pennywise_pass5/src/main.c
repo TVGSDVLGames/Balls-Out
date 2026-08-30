@@ -247,12 +247,12 @@ int main(void) {
         float rightX = cosf(yaw);
         float rightZ = -sinf(yaw);
         fm_vec3_t weaponPos = {{
-            cam.v[0] + forwardVec.v[0] * 20.0f + rightX * 7.5f,
-            cam.v[1] + forwardVec.v[1] * 20.0f - 8.5f,
-            cam.v[2] + forwardVec.v[2] * 20.0f + rightZ * 7.5f
+            cam.v[0] + forwardVec.v[0] * 14.0f + rightX * 2.2f,
+            cam.v[1] + forwardVec.v[1] * 14.0f - 7.0f,
+            cam.v[2] + forwardVec.v[2] * 14.0f + rightZ * 2.2f
         }};
         float kick = shotTimer > 0 ? -0.10f : 0.0f;
-        t3d_mat4fp_from_srt_euler(&weaponMat[frame], (float[3]){0.92f,0.92f,0.92f}, (float[3]){-pitch + kick, yaw - 3.14159265f, 0}, weaponPos.v);
+        t3d_mat4fp_from_srt_euler(&weaponMat[frame], (float[3]){0.16f,0.16f,0.16f}, (float[3]){-pitch + kick, yaw - 3.14159265f, 0}, weaponPos.v);
 
         rdpq_attach(display_get(), display_get_zbuf());
         t3d_frame_start();
