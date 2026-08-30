@@ -40,25 +40,23 @@ jobs:
           sudo env N64_INST=/opt/libdragon make install
           env N64_INST=/opt/libdragon make -C tools/gltf_importer -j2
           sudo env N64_INST=/opt/libdragon make -C tools/gltf_importer install
-      - name: Get Fast64 and genuine CC0 humanoid source
+      - name: Get genuine CC0 humanoid source
         run: |
-          git clone --depth 1 https://github.com/Fast-64/fast64.git /tmp/fast64
           mkdir -p /tmp/quaternius
           wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/night-striker.glb -O /tmp/quaternius/night-striker.glb
           wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt -O /tmp/quaternius/LICENSE.txt
           test -s /tmp/quaternius/night-striker.glb
-      - name: Author Pennywise and sewer in Blender
-        env:
-          BLENDER_USER_SCRIPTS: /tmp/blender_scripts
+          test -s /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+      - name: Author genuine rigged Pennywise and sewer in Blender
         run: |
-          mkdir -p /tmp/blender_scripts/addons
-          ln -s /tmp/fast64 /tmp/blender_scripts/addons/fast64
           cd n64/pennywise_pass4
           rm -rf assets generated && mkdir -p assets generated
-          blender --background --python tools/build_assets.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template /tmp/tiny3d/examples/01_model/assets/model.blend
+          blender --background --python tools/build_assets_v2.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template-glb /tmp/tiny3d/examples/07_skeleton/assets/box.glb
           cp generated/pennywise.glb assets/pennywise.glb
           cp generated/sewer.glb assets/sewer.glb
           cp generated/balloon.glb assets/balloon.glb
+          test -s generated/PENNYWISE_REAL_MESH_PREVIEW.png
+          test -s assets/pennywise.glb
           ls -lh assets generated
       - name: Convert assets and build actual ROM
         run: |
@@ -68,7 +66,7 @@ jobs:
           make -j2
           test -s PENNYWISE64_PASS4.z64
           echo '--- Tiny3D link proof ---'
-          /opt/libdragon/bin/mips64-elf-nm build/PENNYWISE64_PASS4.elf | grep -E 't3d_(model|frame|skeleton|viewport)' | head -20
+          /opt/libdragon/bin/mips64-elf-nm build/PENNYWISE64_PASS4.elf | grep -E 't3d_(model|frame|skeleton|viewport)' | head -30
           ls -lh PENNYWISE64_PASS4.z64 build/PENNYWISE64_PASS4.elf filesystem/*.t3dm
       - name: Validation report
         run: |
@@ -90,14 +88,15 @@ jobs:
             echo 'Assets:'
             ls -lh assets/*.glb filesystem/*.t3dm
             echo
-            echo 'Source character: Quaternius Universal Base Characters / Superhero Male derivative, CC0, from audited public mirror.'
-            echo 'Pennywise body is a decimated genuine skinned humanoid mesh with armature; hair/ruff/nose/face paint/cuffs/pompoms are modeled Blender mesh additions bound to the rig.'
-            echo 'Renderer: libdragon preview RDPQ + Tiny3D RSP microcode. No PASS3 software rasterizer source is present.'
+            echo 'Source character: Quaternius Universal Base Characters derivative, CC0.'
+            echo 'Pennywise body is a genuine skinned humanoid mesh with armature; clown hair/ruff/nose/face paint/cuffs/pompoms are Blender-authored mesh additions bound to its bones.'
+            echo 'GLBs contain Tiny3D-compatible Fast64 f3d_mat metadata copied from a known-good Tiny3D example material without executing the Fast64 UI add-on headlessly.'
+            echo 'Renderer: libdragon preview RDPQ + Tiny3D RSP microcode. No software rasterizer.'
           } > PASS4_VALIDATION.txt
       - name: Package
         run: |
           cd n64/pennywise_pass4
-          mkdir -p dist/source
+          rm -rf dist && mkdir -p dist/source
           cp PENNYWISE64_PASS4.z64 dist/
           cp PASS4_VALIDATION.txt dist/
           cp generated/PENNYWISE_REAL_MESH_PREVIEW.png dist/
@@ -105,13 +104,25 @@ jobs:
           cp assets/*.glb dist/
           cp Makefile dist/source/
           cp src/main.c dist/source/
-          cp tools/build_assets.py dist/source/
+          cp tools/build_assets_v2.py dist/source/
           cp /tmp/quaternius/LICENSE.txt dist/QUATERNIUS_CC0_LICENSE.txt
           (cd dist && zip -r ../Pennywise64_PASS4_REAL_TINY3D.zip .)
-      - uses: actions/upload-artifact@v4
+      - name: Upload completed PASS4
+        uses: actions/upload-artifact@v4
         with:
           name: Pennywise64-PASS4-REAL-Tiny3D
           path: |
             n64/pennywise_pass4/dist/**
             n64/pennywise_pass4/Pennywise64_PASS4_REAL_TINY3D.zip
           if-no-files-found: error
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS4-diagnostics
+          path: |
+            n64/pennywise_pass4/generated/**
+            n64/pennywise_pass4/assets/**
+            n64/pennywise_pass4/build/**
+            n64/pennywise_pass4/filesystem/**
+          if-no-files-found: ignore
