@@ -73,9 +73,16 @@ req(face_anchor,face_geo,'physical face')
 
 # Remove the bright horizontal/vertical cross directly behind the boss. Replace
 # it with two side strips and one ceiling strip so the silhouette stays readable.
-req("for i,x in enumerate((-1.35,1.35)):\n    S(box('BossGlowV%02d'%i,(x,12.65,1.35),(.09,.18,2.18),BOSSGLOW,(.90,.10,.045)))\nfor i,y in enumerate((12.20,13.10)):\n    S(box('BossGlowH%02d'%i,(0,y,2.44),(3.45,.10,.09),BOSSGLOW,(.90,.10,.045)))",
-    "for i,x in enumerate((-1.55,1.55)):\n    S(box('BossGlowV%02d'%i,(x,12.82,1.42),(.075,.12,1.75),BOSSGLOW,(.78,.07,.035)))\nS(box('BossGlowCeiling',(0,12.82,2.62),(2.75,.12,.075),BOSSGLOW,(.78,.07,.035)))",
-    'boss glow')
+old_glow="""for i,x in enumerate((-1.82,1.82)):
+    S(box('BossGlowV%02d'%i,(x,12.65,1.35),(.09,.18,2.18),BOSSGLOW,(.90,.10,.045)))
+for i,y in enumerate((10.42,14.62)):
+    S(box('BossGlowH%02d'%i,(0,y,2.44),(3.45,.10,.09),BOSSGLOW,(.90,.10,.045)))
+"""
+new_glow="""for i,x in enumerate((-1.55,1.55)):
+    S(box('BossGlowV%02d'%i,(x,12.82,1.42),(.075,.12,1.75),BOSSGLOW,(.78,.07,.035)))
+S(box('BossGlowCeiling',(0,12.82,2.62),(2.75,.12,.075),BOSSGLOW,(.78,.07,.035)))
+"""
+req(old_glow,new_glow,'boss glow')
 
 # Rename authored proof outputs.
 s=s.replace('PENNYWISE_PASS8_MODEL_PREVIEW.png','PENNYWISE_PASS9_MODEL_PREVIEW.png')
