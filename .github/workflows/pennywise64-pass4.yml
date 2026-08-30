@@ -13,12 +13,13 @@ jobs:
     timeout-minutes: 45
     env:
       N64_INST: /opt/libdragon
+      LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v4
       - name: Host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git wget curl unzip xz-utils python3 python3-pip python3-numpy blender libpng-dev zlib1g-dev pkg-config zip
+          sudo apt-get install -y build-essential git wget curl unzip xz-utils python3 python3-pip python3-numpy blender libpng-dev zlib1g-dev pkg-config zip libegl1 libgl1 libglx-mesa0 libopengl0 mesa-utils
       - name: Official libdragon GCC 16.2 toolchain
         run: |
           wget -q https://github.com/DragonMinded/libdragon/releases/download/toolchain-continuous-prerelease/gcc-toolchain-mips64-x86_64.deb -O /tmp/n64tc.deb
