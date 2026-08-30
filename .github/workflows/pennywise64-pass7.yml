@@ -1,0 +1,180 @@
+name: Pennywise64 PASS7 textured N64 authenticity
+on:
+  push:
+    branches: [pennywise64-pass7-textures]
+    paths:
+      - 'n64/pennywise_pass5/**'
+      - '.github/workflows/pennywise64-pass7.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      N64_INST: /opt/libdragon
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget curl unzip xz-utils python3 python3-pip python3-numpy blender libpng-dev zlib1g-dev pkg-config zip libegl1 libgl1 libglx-mesa0 libopengl0 mesa-utils xvfb imagemagick libasound2t64 libudev1 libx11-6 libxext6 libxrandr2 libxi6 libxcursor1 libxinerama1 libwayland-client0 libvulkan1 mesa-vulkan-drivers
+      - name: Official libdragon GCC toolchain
+        run: |
+          wget -q https://github.com/DragonMinded/libdragon/releases/download/toolchain-continuous-prerelease/gcc-toolchain-mips64-x86_64.deb -O /tmp/n64tc.deb
+          sudo dpkg -i /tmp/n64tc.deb || sudo apt-get -f install -y
+      - name: Build libdragon preview
+        run: |
+          git clone --depth 1 --branch preview https://github.com/DragonMinded/libdragon.git /tmp/libdragon
+          cd /tmp/libdragon
+          sudo env N64_INST=/opt/libdragon make -j2 install-mk
+          env N64_INST=/opt/libdragon make -j2 libdragon tools
+          sudo env N64_INST=/opt/libdragon make -j2 install tools-install
+      - name: Build Tiny3D and importer
+        run: |
+          git clone --depth 1 https://github.com/HailToDodongo/tiny3d.git /tmp/tiny3d
+          cd /tmp/tiny3d
+          env N64_INST=/opt/libdragon make -j2
+          sudo env N64_INST=/opt/libdragon make install
+          env N64_INST=/opt/libdragon make -C tools/gltf_importer -j2
+          sudo env N64_INST=/opt/libdragon make -C tools/gltf_importer install
+      - name: Get CC0 humanoid and Fast64 template
+        run: |
+          mkdir -p /tmp/quaternius
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/night-striker.glb -O /tmp/quaternius/night-striker.glb
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt -O /tmp/quaternius/LICENSE.txt
+          test -s /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+      - name: Generate PASS7 sources
+        run: |
+          cd n64/pennywise_pass5
+          python3 tools/make_pass7_source.py
+          test -s tools/build_assets_pass7.py
+          test -s src/main_pass7.c
+          grep -q 'PennyFacePatch' tools/build_assets_pass7.py
+          grep -q 'AlcoveDark' tools/build_assets_pass7.py
+          grep -q 'PASS7_TEXTURES' tools/build_assets_pass7.py
+          grep -q 't3d_fog_set_range(205.0f, 700.0f)' src/main_pass7.c
+      - name: Author PASS7 assets and tiny textures
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf assets generated && mkdir -p assets generated
+          blender --background --python tools/build_assets_pass7.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template-glb /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+          cp generated/*.glb assets/
+          cp generated/*.png assets/
+          test -s generated/PENNYWISE_PASS7_MODEL_PREVIEW.png
+          for f in brick stone metal water cloth redcloth skin hair wood face; do test -s "assets/$f.png"; done
+      - name: Validate textures and geometry
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          import struct,json,glob,os
+          for p in glob.glob('assets/*.png'):
+              b=open(p,'rb').read(); assert b[:8]==b'\x89PNG\r\n\x1a\n',p
+              w,h=struct.unpack('>II',b[16:24]); print(p,w,h)
+              assert (w,h) in [(32,32),(64,64)]
+          def doc(path):
+              b=open(path,'rb').read();off=12
+              while off<len(b):
+                  ln,t=struct.unpack_from('<II',b,off);off+=8;d=b[off:off+ln];off+=ln
+                  if t==0x4E4F534A:return json.loads(d.rstrip(b' \0\r\n\t').decode())
+          for p in glob.glob('assets/*.glb'):
+              d=doc(p); print(p,'nodes',len(d.get('nodes',[])),'materials',[m.get('name') for m in d.get('materials',[])])
+          PY
+      - name: Convert textured Tiny3D assets and build PASS7 ROM
+        run: |
+          cd n64/pennywise_pass5
+          export PATH=/opt/libdragon/bin:$PATH
+          make clean
+          make -j2
+          test -s PENNYWISE64_PASS7.z64
+          ls -lh filesystem/*.sprite filesystem/*.t3dm PENNYWISE64_PASS7.z64
+          test $(find filesystem -name '*.sprite' | wc -l) -ge 10
+      - name: Validate PASS7 ROM
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          import hashlib
+          rom=open('PENNYWISE64_PASS7.z64','rb').read();assert rom[:4]==bytes.fromhex('80371240')
+          title=rom[0x20:0x34].decode('ascii','replace').rstrip('\0 ');assert 'PENNYWISE 64 P7' in title,title
+          print(title,len(rom),hashlib.sha256(rom).hexdigest())
+          PY
+      - name: Gopher64 exact-ROM visual smoke boot
+        run: |
+          cd n64/pennywise_pass5
+          wget -q https://github.com/gopher64/gopher64/releases/download/v1.1.36/gopher64-linux-x86_64 -O /tmp/gopher64
+          chmod +x /tmp/gopher64
+          mkdir -p /tmp/gopher-portable && cp /tmp/gopher64 /tmp/gopher-portable/ && touch /tmp/gopher-portable/portable.txt
+          cat >/tmp/asound.conf <<'EOF'
+          pcm.!default { type null }
+          ctl.!default { type null }
+          EOF
+          export ALSA_CONFIG_PATH=/tmp/asound.conf SDL_AUDIODRIVER=dummy DISPLAY=:99
+          Xvfb :99 -screen 0 800x600x24 -nolisten tcp >/tmp/xvfb.log 2>&1 & XVFB_PID=$!
+          sleep 2
+          cd /tmp/gopher-portable
+          set +e
+          timeout --signal=TERM --kill-after=2s 12s ./gopher64 "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS7.z64" >/tmp/gopher64.log 2>&1 & EMU_WRAP=$!
+          sleep 8
+          SMOKE_OK=0
+          if kill -0 "$EMU_WRAP" 2>/dev/null; then
+            import -display :99 -window root "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS7_GOPHER64.png" || true
+            SMOKE_OK=1
+          fi
+          wait "$EMU_WRAP" || true
+          kill "$XVFB_PID" 2>/dev/null || true
+          { echo "GOPHER64_ALIVE_AFTER_8_SECONDS=$([ "$SMOKE_OK" = 1 ] && echo YES || echo NO)"; tail -160 /tmp/gopher64.log || true; } > "$GITHUB_WORKSPACE/n64/pennywise_pass5/PASS7_SMOKE.txt"
+          cd "$GITHUB_WORKSPACE/n64/pennywise_pass5"
+          test "$SMOKE_OK" = 1
+          test -s PENNYWISE64_PASS7_GOPHER64.png
+          if grep -Eqi 'assertion failed|assert failed|backtrace|panic|segmentation fault|not found' PASS7_SMOKE.txt; then cat PASS7_SMOKE.txt; exit 1; fi
+      - name: PASS7 validation report
+        run: |
+          cd n64/pennywise_pass5
+          {
+            echo 'PENNYWISE64 PASS7 - TEXTURED N64 AUTHENTICITY + MODEL PASS'
+            date -u
+            sha256sum PENNYWISE64_PASS7.z64
+            stat -c '%s bytes' PENNYWISE64_PASS7.z64
+            echo '- controlled 32x32/64x64 textures converted with libdragon mksprite'
+            echo '- TEX0 * SHADE Tiny3D combiner with bilinear filtering and active fog'
+            echo '- textured curved Pennywise face patch replaces tiny separate eye/paint geometry'
+            echo '- leaner hair silhouette and smaller physical nose'
+            echo '- maintenance alcove, ladder, valve/cross-pipe, channel grates and broken pipe landmark'
+            echo '- PASS6 folded cloth, arches, mortar, weathering, fog and lighting retained'
+            echo
+            cat PASS7_SMOKE.txt
+          } > PASS7_VALIDATION.txt
+      - name: Package PASS7
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf dist && mkdir -p dist/source dist/textures
+          cp PENNYWISE64_PASS7.z64 PASS7_VALIDATION.txt PASS7_SMOKE.txt PENNYWISE64_PASS7_GOPHER64.png dist/
+          cp generated/PENNYWISE_PASS7_MODEL_PREVIEW.png dist/
+          cp generated/pennywise_pass7.blend generated/sewer_pass7.blend dist/
+          cp assets/*.glb dist/
+          cp assets/*.png dist/textures/
+          cp Makefile src/main_pass7.c tools/build_assets_pass7.py tools/make_pass7_source.py tools/pass7_materials.py dist/source/
+          cp /tmp/quaternius/LICENSE.txt dist/QUATERNIUS_CC0_LICENSE.txt
+          (cd dist && zip -r ../Pennywise64_PASS7_TEXTURED_N64.zip .)
+      - name: Upload PASS7
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS7-TEXTURED-N64
+          path: |
+            n64/pennywise_pass5/dist/**
+            n64/pennywise_pass5/Pennywise64_PASS7_TEXTURED_N64.zip
+          if-no-files-found: error
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS7-diagnostics
+          path: |
+            n64/pennywise_pass5/generated/**
+            n64/pennywise_pass5/assets/**
+            n64/pennywise_pass5/build/**
+            n64/pennywise_pass5/filesystem/**
+            n64/pennywise_pass5/PASS7_SMOKE.txt
+            n64/pennywise_pass5/PENNYWISE64_PASS7_GOPHER64.png
+          if-no-files-found: ignore
