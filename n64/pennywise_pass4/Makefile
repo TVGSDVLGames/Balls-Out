@@ -13,7 +13,7 @@ filesystem/%.t3dm: assets/%.glb
 	@mkdir -p $(dir $@)
 	@echo "    [T3D-MODEL] $@"
 	$(T3D_GLTF_TO_3D) "$<" $@
-	$(N64_BINDIR)/mkasset -c 2 -o filesystem $@
+	$(N64_BINDIR)/mkasset -c 2 -w 256 -o filesystem $@
 
 $(BUILD_DIR)/PENNYWISE64_PASS4.dfs: $(assets_conv)
 $(BUILD_DIR)/PENNYWISE64_PASS4.elf: $(src:%.c=$(BUILD_DIR)/%.o)
