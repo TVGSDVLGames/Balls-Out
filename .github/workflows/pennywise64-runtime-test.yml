@@ -1,0 +1,71 @@
+name: Pennywise64 runtime smoke test
+on:
+  push:
+    branches: [pennywise64-pass4-build]
+    paths:
+      - '.github/workflows/pennywise64-runtime-test.yml'
+  workflow_dispatch: {}
+
+jobs:
+  boot-rom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified PASS4 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Pennywise64-PASS4-REAL-Tiny3D
+          path: /tmp/p64
+          github-token: ${{ github.token }}
+          repository: TVGSDVLGames/Balls-Out
+          run-id: 33305322325
+      - name: Install headless emulator dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick libasound2t64 libudev1 libx11-6 libxext6 libxrandr2 libxi6 libxcursor1 libxinerama1 libwayland-client0 libvulkan1 mesa-vulkan-drivers
+          wget -q https://github.com/gopher64/gopher64/releases/download/v1.1.36/gopher64-linux-x86_64 -O /tmp/gopher64
+          chmod +x /tmp/gopher64
+          /tmp/gopher64 --help > /tmp/gopher64_help.txt 2>&1 || true
+      - name: Boot exact ROM for 10 seconds
+        run: |
+          ROM=$(find /tmp/p64 -name PENNYWISE64_PASS4.z64 -type f | head -1)
+          test -s "$ROM"
+          mkdir -p /tmp/gopher-portable && cp /tmp/gopher64 /tmp/gopher-portable/ && touch /tmp/gopher-portable/portable.txt
+          Xvfb :99 -screen 0 800x600x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
+          XVFB_PID=$!
+          export DISPLAY=:99
+          sleep 2
+          cd /tmp/gopher-portable
+          set +e
+          ./gopher64 "$ROM" >/tmp/gopher64.log 2>&1 &
+          EMU_PID=$!
+          sleep 8
+          if kill -0 "$EMU_PID" 2>/dev/null; then
+            echo 'EMU_ALIVE_AFTER_8_SECONDS=YES' | tee /tmp/SMOKE_RESULT.txt
+            import -display :99 -window root /tmp/PENNYWISE64_GOPHER64_BOOT.png || true
+            kill "$EMU_PID" || true
+            wait "$EMU_PID" || true
+            STATUS=0
+          else
+            wait "$EMU_PID"; RC=$?
+            echo "EMU_ALIVE_AFTER_8_SECONDS=NO exit=$RC" | tee /tmp/SMOKE_RESULT.txt
+            STATUS=1
+          fi
+          kill "$XVFB_PID" || true
+          echo '--- emulator log ---' >> /tmp/SMOKE_RESULT.txt
+          tail -200 /tmp/gopher64.log >> /tmp/SMOKE_RESULT.txt || true
+          echo '--- header ---' >> /tmp/SMOKE_RESULT.txt
+          od -An -tx1 -N64 "$ROM" >> /tmp/SMOKE_RESULT.txt
+          exit $STATUS
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-Gopher64-smoke
+          path: |
+            /tmp/SMOKE_RESULT.txt
+            /tmp/PENNYWISE64_GOPHER64_BOOT.png
+            /tmp/gopher64.log
+            /tmp/xvfb.log
+          if-no-files-found: warn
