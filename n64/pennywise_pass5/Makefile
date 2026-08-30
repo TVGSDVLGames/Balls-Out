@@ -9,8 +9,10 @@ assets_conv = $(addprefix filesystem/,$(notdir $(assets_gltf:%.glb=%.t3dm)))
 
 all: PENNYWISE64_PASS5.z64
 
-filesystem/%.t3dm: assets/%.glb
+filesystem/%.t3dm: assets/%.glb tools/sanitize_materials.py
 	@mkdir -p $(dir $@)
+	@echo "    [SANITIZE] $<"
+	python3 tools/sanitize_materials.py "$<"
 	@echo "    [T3D-MODEL] $@"
 	$(T3D_GLTF_TO_3D) "$<" $@
 	$(N64_BINDIR)/mkasset -c 2 -w 256 -o filesystem $@
