@@ -1,0 +1,218 @@
+name: Pennywise64 PASS5 corrected Tiny3D
+on:
+  push:
+    branches: [pennywise64-pass5-build]
+    paths:
+      - 'n64/pennywise_pass5/**'
+      - '.github/workflows/pennywise64-pass5.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      N64_INST: /opt/libdragon
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget curl unzip xz-utils python3 python3-pip python3-numpy blender libpng-dev zlib1g-dev pkg-config zip libegl1 libgl1 libglx-mesa0 libopengl0 mesa-utils xvfb imagemagick libasound2t64 libudev1 libx11-6 libxext6 libxrandr2 libxi6 libxcursor1 libxinerama1 libwayland-client0 libvulkan1 mesa-vulkan-drivers
+
+      - name: Official libdragon GCC toolchain
+        run: |
+          wget -q https://github.com/DragonMinded/libdragon/releases/download/toolchain-continuous-prerelease/gcc-toolchain-mips64-x86_64.deb -O /tmp/n64tc.deb
+          sudo dpkg -i /tmp/n64tc.deb || sudo apt-get -f install -y
+          /opt/libdragon/bin/mips64-elf-gcc --version | head -1
+
+      - name: Build libdragon preview
+        run: |
+          git clone --depth 1 --branch preview https://github.com/DragonMinded/libdragon.git /tmp/libdragon
+          cd /tmp/libdragon
+          sudo env N64_INST=/opt/libdragon make -j2 install-mk
+          env N64_INST=/opt/libdragon make -j2 libdragon tools
+          sudo env N64_INST=/opt/libdragon make -j2 install tools-install
+
+      - name: Build Tiny3D and importer
+        run: |
+          git clone --depth 1 https://github.com/HailToDodongo/tiny3d.git /tmp/tiny3d
+          cd /tmp/tiny3d
+          env N64_INST=/opt/libdragon make -j2
+          sudo env N64_INST=/opt/libdragon make install
+          env N64_INST=/opt/libdragon make -C tools/gltf_importer -j2
+          sudo env N64_INST=/opt/libdragon make -C tools/gltf_importer install
+
+      - name: Get genuine CC0 humanoid source
+        run: |
+          mkdir -p /tmp/quaternius
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/night-striker.glb -O /tmp/quaternius/night-striker.glb
+          wget -q https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt -O /tmp/quaternius/LICENSE.txt
+          test -s /tmp/quaternius/night-striker.glb
+          test -s /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+
+      - name: Author PASS5 production assets in Blender
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf assets generated && mkdir -p assets generated
+          blender --background --python tools/build_assets.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template-glb /tmp/tiny3d/examples/07_skeleton/assets/box.glb
+          cp generated/pennywise.glb generated/sewer.glb generated/balloon.glb generated/slingshot.glb generated/grate.glb assets/
+          test -s generated/PENNYWISE_PASS5_MODEL_PREVIEW.png
+          for f in assets/pennywise.glb assets/sewer.glb assets/balloon.glb assets/slingshot.glb assets/grate.glb; do test -s "$f"; done
+          ls -lh assets generated
+
+      - name: Validate authored GLB scale and axes
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          import json,struct,glob
+          def doc(path):
+              b=open(path,'rb').read(); off=12
+              while off<len(b):
+                  ln,typ=struct.unpack_from('<II',b,off);off+=8;d=b[off:off+ln];off+=ln
+                  if typ==0x4E4F534A:return json.loads(d.rstrip(b' \0\r\n\t').decode())
+          def bounds(path):
+              d=doc(path); mins=[]; maxs=[]
+              for a in d.get('accessors',[]):
+                  if a.get('type')=='VEC3' and 'min' in a and 'max' in a:
+                      mins.append(a['min']);maxs.append(a['max'])
+              lo=[min(v[i] for v in mins) for i in range(3)];hi=[max(v[i] for v in maxs) for i in range(3)]
+              return lo,hi
+          for p in glob.glob('assets/*.glb'):
+              print(p,bounds(p))
+          lo,hi=bounds('assets/sewer.glb')
+          # Correct glTF/Tiny3D orientation: Y is vertical (~3 units), Z is the long sewer (~15 units).
+          yspan=hi[1]-lo[1]; zspan=hi[2]-lo[2]
+          assert zspan > yspan*3.0, (lo,hi,'sewer axis regression')
+          assert zspan < 20.0, (lo,hi,'sewer scale regression')
+          lo,hi=bounds('assets/pennywise.glb')
+          assert 1.4 < (hi[1]-lo[1]) < 2.6, (lo,hi,'character scale regression')
+          PY
+
+      - name: Convert Tiny3D assets and build actual ROM
+        run: |
+          cd n64/pennywise_pass5
+          export PATH=/opt/libdragon/bin:$PATH
+          make clean
+          make -j2
+          test -s PENNYWISE64_PASS5.z64
+          /opt/libdragon/bin/mips64-elf-nm build/PENNYWISE64_PASS5.elf | grep -E 't3d_(model_draw|model_draw_skinned|skeleton_update|frame_start|viewport)' | head -30
+          ls -lh PENNYWISE64_PASS5.z64 build/PENNYWISE64_PASS5.elf filesystem/*.t3dm
+
+      - name: Validate ROM and gameplay constants
+        run: |
+          cd n64/pennywise_pass5
+          python3 - <<'PY'
+          import hashlib,struct,re
+          rom=open('PENNYWISE64_PASS5.z64','rb').read()
+          assert rom[:4]==bytes.fromhex('80371240'), rom[:4].hex()
+          title=rom[0x20:0x34].decode('ascii','replace').rstrip('\0 ')
+          print('ROM title:',title)
+          print('ROM bytes:',len(rom))
+          print('ROM sha256:',hashlib.sha256(rom).hexdigest())
+          src=open('src/main.c').read()
+          for marker in ['104.0f','-650.0f','slingshot.t3dm','grate.t3dm','1250.0f']:
+              assert marker in src, marker
+          PY
+
+      - name: Gopher64 exact-ROM smoke boot
+        run: |
+          cd n64/pennywise_pass5
+          wget -q https://github.com/gopher64/gopher64/releases/download/v1.1.36/gopher64-linux-x86_64 -O /tmp/gopher64
+          chmod +x /tmp/gopher64
+          mkdir -p /tmp/gopher-portable && cp /tmp/gopher64 /tmp/gopher-portable/ && touch /tmp/gopher-portable/portable.txt
+          cat >/tmp/asound.conf <<'EOF'
+          pcm.!default { type null }
+          ctl.!default { type null }
+          EOF
+          export ALSA_CONFIG_PATH=/tmp/asound.conf
+          export SDL_AUDIODRIVER=dummy
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 800x600x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
+          XVFB_PID=$!
+          sleep 2
+          cd /tmp/gopher-portable
+          set +e
+          timeout --signal=TERM --kill-after=2s 11s ./gopher64 "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS5.z64" >/tmp/gopher64.log 2>&1 &
+          EMU_WRAP=$!
+          sleep 7
+          if kill -0 "$EMU_WRAP" 2>/dev/null; then
+            echo 'GOPHER64_ALIVE_AFTER_7_SECONDS=YES' | tee /tmp/PASS5_SMOKE.txt
+            import -display :99 -window root "$GITHUB_WORKSPACE/n64/pennywise_pass5/PENNYWISE64_PASS5_GOPHER64.png" || true
+            SMOKE_OK=1
+          else
+            echo 'GOPHER64_ALIVE_AFTER_7_SECONDS=NO' | tee /tmp/PASS5_SMOKE.txt
+            SMOKE_OK=0
+          fi
+          wait "$EMU_WRAP" || true
+          kill "$XVFB_PID" 2>/dev/null || true
+          echo '--- emulator log ---' >> /tmp/PASS5_SMOKE.txt
+          tail -120 /tmp/gopher64.log >> /tmp/PASS5_SMOKE.txt || true
+          cp /tmp/PASS5_SMOKE.txt "$GITHUB_WORKSPACE/n64/pennywise_pass5/PASS5_SMOKE.txt"
+          test "$SMOKE_OK" = 1
+
+      - name: Validation report
+        run: |
+          cd n64/pennywise_pass5
+          {
+            echo 'PENNYWISE64 PASS5 - CORRECTED SCALE / PRODUCTION CHARACTER / REAL 3D WEAPON'
+            date -u
+            echo
+            echo 'ROM:'
+            sha256sum PENNYWISE64_PASS5.z64
+            stat -c '%s bytes' PENNYWISE64_PASS5.z64
+            echo
+            echo 'Changes from PASS4:'
+            echo '- Sewer rebuilt on correct Blender axes so glTF/Tiny3D Y is vertical and Z is route depth.'
+            echo '- Gameplay world rescaled around the genuine ~1.9m humanoid (Tiny3D importer scale ~64).'
+            echo '- Player eye height 104 units; route ~650 units plus ~300-unit boss chamber.'
+            echo '- Pennywise now has layered antique-clown costume geometry, rounded hair masses, face geometry, ruffles and shoes.'
+            echo '- Separate real Tiny3D slingshot model drawn as first-person geometry.'
+            echo '- Gate model seals boss chamber.'
+            echo '- Movement and boss chase are delta-time based.'
+            echo '- Three-dimensional aim test includes pitch.'
+            echo '- Gopher64 exact-ROM smoke boot performed with captured evidence.'
+            echo
+            cat PASS5_SMOKE.txt
+            echo
+            echo 'Tiny3D symbols:'
+            /opt/libdragon/bin/mips64-elf-nm build/PENNYWISE64_PASS5.elf | grep -E 't3d_(model_load|model_draw|model_draw_skinned|skeleton_create|skeleton_update|frame_start|viewport)' | head -40
+          } > PASS5_VALIDATION.txt
+
+      - name: Package PASS5
+        run: |
+          cd n64/pennywise_pass5
+          rm -rf dist && mkdir -p dist/source
+          cp PENNYWISE64_PASS5.z64 PASS5_VALIDATION.txt PASS5_SMOKE.txt dist/
+          cp generated/PENNYWISE_PASS5_MODEL_PREVIEW.png dist/
+          test -f PENNYWISE64_PASS5_GOPHER64.png && cp PENNYWISE64_PASS5_GOPHER64.png dist/ || true
+          cp generated/pennywise_pass5.blend generated/sewer_pass5.blend dist/
+          cp assets/*.glb dist/
+          cp Makefile src/main.c tools/build_assets.py dist/source/
+          cp /tmp/quaternius/LICENSE.txt dist/QUATERNIUS_CC0_LICENSE.txt
+          (cd dist && zip -r ../Pennywise64_PASS5_REAL_TINY3D.zip .)
+
+      - name: Upload completed PASS5
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS5-REAL-Tiny3D
+          path: |
+            n64/pennywise_pass5/dist/**
+            n64/pennywise_pass5/Pennywise64_PASS5_REAL_TINY3D.zip
+          if-no-files-found: error
+
+      - name: Upload PASS5 diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pennywise64-PASS5-diagnostics
+          path: |
+            n64/pennywise_pass5/generated/**
+            n64/pennywise_pass5/assets/**
+            n64/pennywise_pass5/build/**
+            n64/pennywise_pass5/filesystem/**
+            n64/pennywise_pass5/PASS5_SMOKE.txt
+            n64/pennywise_pass5/PENNYWISE64_PASS5_GOPHER64.png
+          if-no-files-found: ignore
