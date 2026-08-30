@@ -68,7 +68,9 @@ def sanitize(path):
         if isinstance(rdp, dict):
             rdp['g_shade'] = 1
             rdp['g_lighting'] = 1
-            rdp['g_fog'] = 0
+            # Fast64 g_fog=1 maps to Tiny3D's active fog mode.  PASS6 then
+            # supplies the actual range/color at runtime through t3d_fog_*.
+            rdp['g_fog'] = 1
             rdp['g_tex_gen'] = 0
             rdp['g_tex_gen_linear'] = 0
             rdp['g_mdsft_cycletype'] = 0
@@ -88,7 +90,7 @@ def sanitize(path):
     for bad in (b'crate00', b'.ci8.png', b'.rgba16.png'):
         if bad in after:
             raise RuntimeError(f'{path}: hidden texture dependency remains: {bad!r}')
-    print(f'SANITIZED {path}: {count} materials -> untextured SHADE/vertex-color pipeline')
+    print(f'SANITIZED {path}: {count} materials -> fogged SHADE/vertex-color pipeline')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
