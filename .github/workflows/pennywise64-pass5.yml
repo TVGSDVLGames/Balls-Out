@@ -56,6 +56,29 @@ jobs:
       - name: Author PASS5 production assets in Blender
         run: |
           cd n64/pennywise_pass5
+          # Blender's glTF skin exporter requires skinned attachments to be children of the armature.
+          # Keep this exact source correction in the packaged build as well.
+          python3 - <<'PY'
+          p='tools/build_assets.py'
+          s=open(p).read()
+          old="""def bind(o, arm, bone):
+              if not bone or o.type!='MESH': return
+              mod=o.modifiers.new('Armature','ARMATURE'); mod.object=arm
+              vg=o.vertex_groups.new(name=bone)
+              vg.add(list(range(len(o.data.vertices))),1.0,'REPLACE')
+          """
+          new="""def bind(o, arm, bone):
+              if not bone or o.type!='MESH': return
+              world=o.matrix_world.copy()
+              o.parent=arm
+              o.matrix_world=world
+              mod=o.modifiers.new('Armature','ARMATURE'); mod.object=arm
+              vg=o.vertex_groups.new(name=bone)
+              vg.add(list(range(len(o.data.vertices))),1.0,'REPLACE')
+          """
+          if old not in s: raise SystemExit('bind() patch target not found')
+          open(p,'w').write(s.replace(old,new,1))
+          PY
           rm -rf assets generated && mkdir -p assets generated
           blender --background --python tools/build_assets.py -- --base /tmp/quaternius/night-striker.glb --out "$PWD/generated" --template-glb /tmp/tiny3d/examples/07_skeleton/assets/box.glb
           cp generated/pennywise.glb generated/sewer.glb generated/balloon.glb generated/slingshot.glb generated/grate.glb assets/
@@ -67,28 +90,85 @@ jobs:
         run: |
           cd n64/pennywise_pass5
           python3 - <<'PY'
-          import json,struct,glob
+          import json,struct,glob,math
+
           def doc(path):
               b=open(path,'rb').read(); off=12
               while off<len(b):
-                  ln,typ=struct.unpack_from('<II',b,off);off+=8;d=b[off:off+ln];off+=ln
-                  if typ==0x4E4F534A:return json.loads(d.rstrip(b' \0\r\n\t').decode())
-          def bounds(path):
-              d=doc(path); mins=[]; maxs=[]
-              for a in d.get('accessors',[]):
-                  if a.get('type')=='VEC3' and 'min' in a and 'max' in a:
-                      mins.append(a['min']);maxs.append(a['max'])
-              lo=[min(v[i] for v in mins) for i in range(3)];hi=[max(v[i] for v in maxs) for i in range(3)]
+                  ln,typ=struct.unpack_from('<II',b,off); off+=8
+                  d=b[off:off+ln]; off+=ln
+                  if typ==0x4E4F534A:
+                      return json.loads(d.rstrip(b' \0\r\n\t').decode())
+              raise RuntimeError('no JSON chunk: '+path)
+
+          def ident():
+              return [[1.,0.,0.,0.],[0.,1.,0.,0.],[0.,0.,1.,0.],[0.,0.,0.,1.]]
+
+          def mm(a,b):
+              return [[sum(a[r][k]*b[k][c] for k in range(4)) for c in range(4)] for r in range(4)]
+
+          def node_matrix(n):
+              if 'matrix' in n:
+                  a=n['matrix']
+                  return [[float(a[c*4+r]) for c in range(4)] for r in range(4)]
+              x,y,z,w=map(float,n.get('rotation',[0,0,0,1]))
+              sx,sy,sz=map(float,n.get('scale',[1,1,1]))
+              tx,ty,tz=map(float,n.get('translation',[0,0,0]))
+              xx,yy,zz=x*x,y*y,z*z; xy,xz,yz=x*y,x*z,y*z; wx,wy,wz=w*x,w*y,w*z
+              r=[[1-2*(yy+zz),2*(xy-wz),2*(xz+wy),0],
+                 [2*(xy+wz),1-2*(xx+zz),2*(yz-wx),0],
+                 [2*(xz-wy),2*(yz+wx),1-2*(xx+yy),0],
+                 [0,0,0,1]]
+              sm=[[sx,0,0,0],[0,sy,0,0],[0,0,sz,0],[0,0,0,1]]
+              m=mm(r,sm); m[0][3]=tx; m[1][3]=ty; m[2][3]=tz
+              return m
+
+          def xform(m,p):
+              q=[p[0],p[1],p[2],1.]
+              return [sum(m[r][c]*q[c] for c in range(4)) for r in range(3)]
+
+          def world_bounds(path):
+              d=doc(path); nodes=d.get('nodes',[]); meshes=d.get('meshes',[]); access=d.get('accessors',[])
+              parents={}
+              for i,n in enumerate(nodes):
+                  for c in n.get('children',[]): parents[c]=i
+              cache={}
+              def world(i):
+                  if i in cache:return cache[i]
+                  local=node_matrix(nodes[i])
+                  cache[i]=mm(world(parents[i]),local) if i in parents else local
+                  return cache[i]
+              lo=[math.inf]*3; hi=[-math.inf]*3; count=0
+              for ni,n in enumerate(nodes):
+                  if 'mesh' not in n: continue
+                  wm=world(ni)
+                  for prim in meshes[n['mesh']].get('primitives',[]):
+                      ai=prim.get('attributes',{}).get('POSITION')
+                      if ai is None: continue
+                      a=access[ai]
+                      if 'min' not in a or 'max' not in a: continue
+                      mn,mx=a['min'],a['max']
+                      for bits in range(8):
+                          p=[mx[k] if bits&(1<<k) else mn[k] for k in range(3)]
+                          q=xform(wm,p)
+                          for k in range(3): lo[k]=min(lo[k],q[k]); hi[k]=max(hi[k],q[k])
+                      count+=1
+              if not count: raise RuntimeError('no POSITION bounds: '+path)
               return lo,hi
+
           for p in glob.glob('assets/*.glb'):
-              print(p,bounds(p))
-          lo,hi=bounds('assets/sewer.glb')
-          # Correct glTF/Tiny3D orientation: Y is vertical (~3 units), Z is the long sewer (~15 units).
+              print(p,world_bounds(p))
+          lo,hi=world_bounds('assets/sewer.glb')
           yspan=hi[1]-lo[1]; zspan=hi[2]-lo[2]
-          assert zspan > yspan*3.0, (lo,hi,'sewer axis regression')
-          assert zspan < 20.0, (lo,hi,'sewer scale regression')
-          lo,hi=bounds('assets/pennywise.glb')
-          assert 1.4 < (hi[1]-lo[1]) < 2.6, (lo,hi,'character scale regression')
+          print('SEWER_WORLD_SPAN',{'x':hi[0]-lo[0],'y':yspan,'z':zspan})
+          # Correct glTF/Tiny3D orientation: Y is ~2.9 units vertical, Z is ~15 units route depth.
+          assert 2.5 < yspan < 3.5, (lo,hi,'sewer vertical scale regression')
+          assert 14.0 < zspan < 16.5, (lo,hi,'sewer route scale/axis regression')
+          assert zspan > yspan*4.0, (lo,hi,'sewer axis regression')
+          lo,hi=world_bounds('assets/pennywise.glb')
+          ph=hi[1]-lo[1]
+          print('PENNYWISE_WORLD_HEIGHT',ph)
+          assert 1.4 < ph < 2.8, (lo,hi,'character scale regression')
           PY
 
       - name: Convert Tiny3D assets and build actual ROM
@@ -105,7 +185,7 @@ jobs:
         run: |
           cd n64/pennywise_pass5
           python3 - <<'PY'
-          import hashlib,struct,re
+          import hashlib
           rom=open('PENNYWISE64_PASS5.z64','rb').read()
           assert rom[:4]==bytes.fromhex('80371240'), rom[:4].hex()
           title=rom[0x20:0x34].decode('ascii','replace').rstrip('\0 ')
