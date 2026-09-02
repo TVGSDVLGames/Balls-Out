@@ -1,0 +1,113 @@
+name: Build Bobble40 Web Demo
+
+on:
+  push:
+    branches: [bobble40-build]
+    paths:
+      - '.github/workflows/bobble40-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-bobble40:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bobble40-build
+
+      - name: Recover verified Bobble40 demo source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 \
+            'https://api.github.com/repos/TVGSDVLGames/Balls-Out/git/blobs/30631e5c6ef4528a38bc867f31b01d1130934dad' \
+            -o relay.json
+          python3 - <<'PY'
+          import json,base64,pathlib
+          obj=json.load(open('relay.json'))
+          raw=base64.b64decode(''.join(obj['content'].split()))
+          pathlib.Path('relay.b64').write_bytes(raw)
+          print('relay chars',len(raw))
+          PY
+          base64 -d relay.b64 > bobble40.tar.xz
+          test "$(stat -c%s bobble40.tar.xz)" = 518540
+          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
+          rm -rf project
+          mkdir project
+          tar -xJf bobble40.tar.xz -C project
+          test -s project/project.godot
+
+      - name: Download Godot 4.7.1 editor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 \
+            'https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip' \
+            -o godot.zip
+          unzip -q godot.zip -d godot-bin
+          GODOT="$(find godot-bin -type f -name 'Godot_v4.7.1-stable_linux.x86_64' | head -1)"
+          test -n "$GODOT"
+          chmod +x "$GODOT"
+          echo "$GODOT" > godot-path.txt
+          "$GODOT" --version
+
+      - name: Import and compile Bobble40 PCK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GODOT="$(cat godot-path.txt)"
+          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path project
+          rm -rf bobble40
+          mkdir bobble40
+          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path project --export-pack Web "$GITHUB_WORKSPACE/bobble40/index.pck"
+          test -s bobble40/index.pck
+          echo "Bobble40 PCK: $(stat -c%s bobble40/index.pck) bytes"
+
+      - name: Fetch verified Godot 4.7.1 browser runtime
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE='https://raw.githubusercontent.com/TVGSDVLGames/Creature-Simulator/main/web'
+          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do
+            curl -L --fail --retry 3 "$BASE/$f" -o "bobble40/$f"
+          done
+          test -s bobble40/index.wasm
+          test -s bobble40/index.js
+
+      - name: Brand and patch browser loader
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('bobble40/index.html')
+          s=html.read_text()
+          size=Path('bobble40/index.pck').stat().st_size
+          s,n=re.subn(r'("index\.pck"\s*:\s*)\d+',rf'\g<1>{size}',s)
+          if n != 1:
+              raise SystemExit(f'PCK size patch count was {n}')
+          s=re.sub(r'<title>.*?</title>','<title>Bobble40</title>',s,flags=re.S)
+          s=s.replace('<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">','<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">')
+          html.write_text(s)
+          print('patched PCK size',size)
+          PY
+          grep -q '<title>Bobble40</title>' bobble40/index.html
+          ls -lh bobble40
+
+      - name: Commit playable Bobble40 site
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name 'TVGSDVLGames'
+          git config user.email 'TVGSDVLGames@users.noreply.github.com'
+          git add -f bobble40
+          if git diff --cached --quiet; then
+            echo 'Bobble40 web build already current.'
+          else
+            git commit -m 'Publish playable Bobble40 web demo'
+            git push origin HEAD:bobble40-build
+          fi
