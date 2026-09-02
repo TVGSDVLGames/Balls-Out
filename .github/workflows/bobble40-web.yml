@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-relay/p00.txt bobble40-relay/p01.txt bobble40-relay/p02.txt bobble40-relay/p03.txt bobble40-relay/p04.txt | base64 -d > bobble40.tar.xz
+          cat bobble40-relay/p00.txt bobble40-relay/p01.txt bobble40-relay/p02.txt bobble40-relay/p03.txt bobble40-relay/p04.txt | tr -cd 'A-Za-z0-9+/=' | base64 -d > bobble40.tar.xz
           test "$(stat -c%s bobble40.tar.xz)" = 518540
           echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
           rm -rf project
