@@ -4,13 +4,12 @@ on:
   push:
     branches: [bobble40-build]
     paths:
-      - 'bobble40-relay/**'
+      - 'bobble40-live-relay2/**'
       - '.github/workflows/bobble40-build.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build:
@@ -22,66 +21,47 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-relay/p00.txt bobble40-relay/p01.txt bobble40-relay/p02.txt bobble40-relay/p03.txt bobble40-relay/p04.txt | base64 -d > bobble40.tar.xz
+          cat bobble40-live-relay2/r{00..20} > relay.b64
+          test "$(stat -c%s relay.b64)" = 418950
+          base64 -d relay.b64 > bobble40.tar.xz
+          test "$(stat -c%s bobble40.tar.xz)" = 314211
           echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
-          mkdir -p src
+          mkdir src
           tar -xJf bobble40.tar.xz -C src
-          test -f src/project.godot
-          test -f src/scripts/main.gd
+          test -s src/project.godot
+          test -s src/scripts/main.gd
 
-      - name: Download Godot 4.7.1 editor
+      - name: Install Godot 4.7.1 and Web templates
         shell: bash
         run: |
           set -euxo pipefail
           curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          curl -L --fail --retry 3 -o templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
           unzip -q godot.zip
-          GODOT=$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -name 'Godot_v4.7.1-stable_linux.x86_64' | head -1)
-          test -n "$GODOT"
+          GODOT="$GITHUB_WORKSPACE/Godot_v4.7.1-stable_linux.x86_64"
           chmod +x "$GODOT"
           echo "GODOT=$GODOT" >> "$GITHUB_ENV"
-          "$GODOT" --version
-
-      - name: Install matching Web templates
-        uses: actions/download-artifact@v4
-        with:
-          name: godot-4.7.1-web-templates
-          path: webtpl
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 33690895604
-
-      - name: Prepare export templates
-        shell: bash
-        run: |
-          set -euxo pipefail
           TPL="$HOME/.local/share/godot/export_templates/4.7.1.stable"
-          mkdir -p "$TPL"
-          find webtpl -type f -name 'web_nothreads_release.zip' -exec cp '{}' "$TPL/web_nothreads_release.zip" \;
-          find webtpl -type f -name 'web_nothreads_debug.zip' -exec cp '{}' "$TPL/web_nothreads_debug.zip" \;
+          mkdir -p "$TPL" tpl-unpack
+          unzip -q templates.tpz -d tpl-unpack
+          cp -a tpl-unpack/templates/. "$TPL/"
           test -s "$TPL/web_nothreads_release.zip"
-          test -s "$TPL/web_nothreads_debug.zip"
 
-      - name: Import and export Web
+      - name: Verify demo cut and export Web
         shell: bash
         run: |
           set -euxo pipefail
-          rm -rf bobble40-web
-          mkdir -p bobble40-web
+          grep -Eq 'DEMO_ROUND_COUNT:int *= *10|DEMO_LAST_LEVEL:int *= *9' src/scripts/main.gd
+          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
+          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
+          mkdir bobble40-web
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path src
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path src --export-release Web "$GITHUB_WORKSPACE/bobble40-web/index.html"
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
-          ls -lh bobble40-web
 
-      - name: Confirm demo cut
-        shell: bash
-        run: |
-          set -euxo pipefail
-          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
-          grep -q 'DEMO_LAST_LEVEL:int=9' src/scripts/main.gd
-          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
-
-      - name: Publish compiled browser files
+      - name: Publish browser files
         shell: bash
         run: |
           set -euxo pipefail
