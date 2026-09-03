@@ -1,0 +1,1 @@
+Correct source is Bobble40_BIG40_NETLIFY_MOBILE_READY / sanitized 10-round Bubble Bobble build. Do not use existing web/index.pck (Balls Out).
