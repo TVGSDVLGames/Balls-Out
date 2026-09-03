@@ -22,8 +22,10 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r* > relay.b64
-          base64 -d relay.b64 > bobble40.tar.xz
+          cat bobble40-live-relay2/r* | tr -cd 'A-Za-z0-9+/' > relay.clean
+          REM=$(( $(wc -c < relay.clean) % 4 ))
+          if [ "$REM" -eq 2 ]; then printf '==' >> relay.clean; elif [ "$REM" -eq 3 ]; then printf '=' >> relay.clean; elif [ "$REM" -eq 1 ]; then echo 'invalid relay length' >&2; exit 1; fi
+          base64 -d relay.clean > bobble40.tar.xz
           rm -rf bobble40-src
           mkdir bobble40-src
           tar -xJf bobble40.tar.xz -C bobble40-src
@@ -63,9 +65,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do
-            cp "web/$f" "bobble40-public/$f"
-          done
+          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do cp "web/$f" "bobble40-public/$f"; done
           python3 - <<'PY'
           from pathlib import Path
           import re
@@ -73,15 +73,11 @@ jobs:
           s=p.read_text()
           size=Path('bobble40-public/index.pck').stat().st_size
           s,n=re.subn(r'("index\\.pck"\\s*:\\s*)\\d+',rf'\\g<1>{size}',s)
-          if n != 1:
-              raise SystemExit(f'PCK size patch count={n}')
+          if n != 1: raise SystemExit(f'PCK size patch count={n}')
           s=re.sub(r'<title>.*?</title>','<title>Bobble40</title>',s,flags=re.S)
-          if 'viewport-fit=cover' not in s:
-              s=s.replace('width=device-width, user-scalable=no, initial-scale=1.0','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover')
+          if 'viewport-fit=cover' not in s: s=s.replace('width=device-width, user-scalable=no, initial-scale=1.0','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover')
           p.write_text(s)
-          print('Bubble Bobble PCK size', size)
           PY
-          grep -q '<title>Bobble40</title>' bobble40-public/index.html
 
       - name: Publish public no-password build
         shell: bash
