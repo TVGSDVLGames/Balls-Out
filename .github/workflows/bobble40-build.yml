@@ -5,6 +5,7 @@ on:
     branches: [bobble40-final-live-9]
     paths:
       - '.github/workflows/bobble40-build.yml'
+      - 'bobble40-correct-relay/**'
   workflow_dispatch:
 
 permissions:
@@ -18,16 +19,19 @@ jobs:
         with:
           ref: bobble40-final-live-9
 
-      - name: Reconstruct Bubble Bobble source from verified relay
+      - name: Reconstruct correct Bubble Bobble source
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-relay-final19/f00 bobble40-relay-final19/f01 bobble40-relay-final19/f02 bobble40-relay-final19/f03 bobble40-relay-final19/f04 bobble40-relay-final19/f05 bobble40-relay-final19/f06 bobble40-relay-final19/f07 bobble40-relay-final19/f08 bobble40-relay-final19/f09 bobble40-relay-final19/f10 | tr -cd 'A-Za-z0-9+/=' | base64 -d > bobble40-source-fixed.tar.xz
-          xz -t bobble40-source-fixed.tar.xz
+          test "$(find bobble40-correct-relay -maxdepth 1 -name 'k*.b64' | wc -l)" -eq 11
+          cat bobble40-correct-relay/k00.b64 bobble40-correct-relay/k01.b64 bobble40-correct-relay/k02.b64 bobble40-correct-relay/k03.b64 bobble40-correct-relay/k04.b64 bobble40-correct-relay/k05.b64 bobble40-correct-relay/k06.b64 bobble40-correct-relay/k07.b64 bobble40-correct-relay/k08.b64 bobble40-correct-relay/k09.b64 bobble40-correct-relay/k10.b64 | tr -cd 'A-Za-z0-9+/=' | base64 -d > bobble40-correct-source.tar.xz
+          xz -t bobble40-correct-source.tar.xz
           rm -rf src
           mkdir src
-          tar -xJf bobble40-source-fixed.tar.xz -C src
+          tar -xJf bobble40-correct-source.tar.xz -C src
           test -s src/project.godot
+          test -s src/export_presets.cfg
+          test -s src/Main.tscn
           test -s src/scripts/main.gd
           grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
           grep -qi 'bubble\|bobble' src/project.godot src/scripts/main.gd
@@ -45,9 +49,10 @@ jobs:
           TPL="$HOME/.local/share/godot/export_templates/4.7.1.stable"
           mkdir -p "$TPL"
           unzip -j templates.tpz 'templates/web_nothreads_release.zip' -d "$TPL"
+          unzip -j templates.tpz 'templates/web_nothreads_debug.zip' -d "$TPL"
           printf '4.7.1.stable\n' > "$TPL/version.txt"
 
-      - name: Export Bubble Bobble mobile web build
+      - name: Export correct Bubble Bobble mobile web build
         shell: bash
         run: |
           set -euxo pipefail
@@ -61,18 +66,7 @@ jobs:
           sed -i 's#<title>[^<]*</title>#<title>Bubble Bobble: Big 40!</title>#' bobble40-web/index.html
           grep -q 'Bubble Bobble: Big 40!' bobble40-web/index.html
 
-      - name: Deploy Bubble Bobble to Netlify
-        shell: bash
-        run: |
-          set -euxo pipefail
-          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-web 2>&1 | tee netlify-output.txt
-          URL=$(grep -Eo 'https?://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
-          test -n "$URL"
-          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
-          curl -L --fail --retry 5 "$URL" | grep -q 'Bubble Bobble: Big 40!'
-          echo "LIVE_URL=$URL"
-
-      - name: Save exact Bubble Bobble build and URL
+      - name: Commit exact correct browser build
         shell: bash
         run: |
           set -euxo pipefail
@@ -80,6 +74,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           rm -rf bobble40
           mv bobble40-web bobble40
-          git add -f bobble40 BOBBLE40_NETLIFY_URL.txt
-          git commit -m 'Publish correct Bubble Bobble 40 mobile web build' || exit 0
+          printf 'Bubble Bobble: Big 40! correct mobile browser build\n' > BOBBLE40_BUILD.txt
+          git add -f bobble40 BOBBLE40_BUILD.txt
+          git commit -m 'Build correct Bubble Bobble 40 mobile web version' || exit 0
           git push origin HEAD:bobble40-final-live-9
