@@ -2,9 +2,9 @@ name: Build Bobble40 Web
 
 on:
   push:
-    branches: [bobble40-build]
+    branches: [bobble40-final-live-9]
     paths:
-      - 'bobble40-relay/**'
+      - 'bobble40-source.tar.xz'
       - '.github/workflows/bobble40-build.yml'
   workflow_dispatch:
 
@@ -18,16 +18,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Reconstruct verified 10-round source
+      - name: Verify and extract 10-round source
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-relay/p00.txt bobble40-relay/p01.txt bobble40-relay/p02.txt bobble40-relay/p03.txt bobble40-relay/p04.txt | base64 -d > bobble40.tar.xz
-          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
+          test "$(stat -c%s bobble40-source.tar.xz)" = 518540
+          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40-source.tar.xz' | sha256sum -c -
           mkdir -p src
-          tar -xJf bobble40.tar.xz -C src
+          tar -xJf bobble40-source.tar.xz -C src
           test -f src/project.godot
           test -f src/scripts/main.gd
+
+      - name: Confirm demo cut
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
+          grep -q 'DEMO_LAST_LEVEL:int=9' src/scripts/main.gd
+          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
 
       - name: Download Godot 4.7.1 editor
         shell: bash
@@ -71,15 +79,8 @@ jobs:
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
+          sed -i 's#<title>[^<]*</title>#<title>Bobble40</title>#' bobble40-web/index.html
           ls -lh bobble40-web
-
-      - name: Confirm demo cut
-        shell: bash
-        run: |
-          set -euxo pipefail
-          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
-          grep -q 'DEMO_LAST_LEVEL:int=9' src/scripts/main.gd
-          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
 
       - name: Publish compiled browser files
         shell: bash
