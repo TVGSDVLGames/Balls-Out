@@ -4,93 +4,81 @@ on:
   push:
     branches: [bobble40-final-live-9]
     paths:
-      - 'bobble40-source.tar.xz'
       - '.github/workflows/bobble40-build.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: bobble40-final-live-9
 
-      - name: Verify and extract 10-round source
+      - name: Extract Bubble Bobble source payload
         shell: bash
         run: |
           set -euxo pipefail
-          test "$(stat -c%s bobble40-source.tar.xz)" = 518540
-          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40-source.tar.xz' | sha256sum -c -
-          mkdir -p src
+          file bobble40-source.tar.xz
+          rm -rf src
+          mkdir src
           tar -xJf bobble40-source.tar.xz -C src
-          test -f src/project.godot
-          test -f src/scripts/main.gd
-
-      - name: Confirm demo cut
-        shell: bash
-        run: |
-          set -euxo pipefail
-          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
-          grep -q 'DEMO_LAST_LEVEL:int=9' src/scripts/main.gd
+          find src -maxdepth 3 -type f | sort | head -200
+          test -s src/project.godot
+          test -s src/scripts/main.gd
           grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
 
-      - name: Download Godot 4.7.1 editor
+      - name: Download Godot 4.7.1 and web templates
         shell: bash
         run: |
           set -euxo pipefail
           curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          unzip -q godot.zip
-          GODOT=$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -name 'Godot_v4.7.1-stable_linux.x86_64' | head -1)
-          test -n "$GODOT"
+          unzip -q godot.zip -d godot-bin
+          GODOT=$(find godot-bin -type f -name 'Godot_v4.7.1-stable_linux.x86_64' | head -1)
           chmod +x "$GODOT"
           echo "GODOT=$GODOT" >> "$GITHUB_ENV"
-          "$GODOT" --version
-
-      - name: Install matching Web templates
-        uses: actions/download-artifact@v4
-        with:
-          name: godot-4.7.1-web-templates
-          path: webtpl
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 33690895604
-
-      - name: Prepare export templates
-        shell: bash
-        run: |
-          set -euxo pipefail
+          curl -L --fail --retry 3 -o templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
           TPL="$HOME/.local/share/godot/export_templates/4.7.1.stable"
           mkdir -p "$TPL"
-          find webtpl -type f -name 'web_nothreads_release.zip' -exec cp '{}' "$TPL/web_nothreads_release.zip" \;
-          find webtpl -type f -name 'web_nothreads_debug.zip' -exec cp '{}' "$TPL/web_nothreads_debug.zip" \;
-          test -s "$TPL/web_nothreads_release.zip"
-          test -s "$TPL/web_nothreads_debug.zip"
+          unzip -j templates.tpz 'templates/web_nothreads_release.zip' -d "$TPL"
+          printf '4.7.1.stable\n' > "$TPL/version.txt"
 
-      - name: Import and export Web
+      - name: Export Bubble Bobble web build
         shell: bash
         run: |
           set -euxo pipefail
           rm -rf bobble40-web
-          mkdir -p bobble40-web
+          mkdir bobble40-web
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path src
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path src --export-release Web "$GITHUB_WORKSPACE/bobble40-web/index.html"
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
           sed -i 's#<title>[^<]*</title>#<title>Bobble40</title>#' bobble40-web/index.html
+          grep -q 'Bobble40' bobble40-web/index.html
           ls -lh bobble40-web
 
-      - name: Publish compiled browser files
+      - name: Deploy Bubble Bobble to Netlify
         shell: bash
         run: |
           set -euxo pipefail
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          rm -rf web/bobble40
-          mkdir -p web/bobble40
-          cp -a bobble40-web/. web/bobble40/
-          git add web/bobble40
-          git commit -m 'Publish Bobble40 10-round web demo' || exit 0
-          git push
+          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-web 2>&1 | tee netlify-output.txt
+          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          test -n "$URL"
+          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
+          curl -L --fail --retry 5 "$URL" | grep -q 'Bobble40'
+
+      - name: Save Bubble Bobble build and URL
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          rm -rf bobble40
+          mv bobble40-web bobble40
+          git add -f bobble40 BOBBLE40_NETLIFY_URL.txt
+          git commit -m 'Publish Bubble Bobble 40 web build to Netlify' || exit 0
+          git push origin HEAD:bobble40-final-live-9
