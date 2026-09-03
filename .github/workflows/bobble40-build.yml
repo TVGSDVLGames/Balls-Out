@@ -4,7 +4,6 @@ on:
   push:
     branches: [bobble40-build]
     paths:
-      - 'bobble40-live-relay2/**'
       - '.github/workflows/bobble40-build.yml'
   workflow_dispatch:
 
@@ -16,8 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: bobble40-build
 
-      - name: Reconstruct verified 10-round source
+      - name: Reconstruct verified Bubble Bobble 10-round source
         shell: bash
         run: |
           set -euxo pipefail
@@ -31,6 +32,9 @@ jobs:
           tar -xJf bobble40.tar.xz -C src
           test -s src/project.godot
           test -s src/scripts/main.gd
+          grep -Eq 'DEMO_ROUND_COUNT:int *= *10|DEMO_LAST_LEVEL:int *= *9' src/scripts/main.gd
+          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
+          grep -qi 'bubble\|bobble' src/project.godot src/scripts/main.gd
 
       - name: Install Godot 4.7.1 and Web templates
         shell: bash
@@ -48,22 +52,31 @@ jobs:
           cp -a tpl-unpack/templates/. "$TPL/"
           test -s "$TPL/web_nothreads_release.zip"
 
-      - name: Verify demo cut and export Web
+      - name: Export verified Bubble Bobble mobile Web build
         shell: bash
         run: |
           set -euxo pipefail
-          grep -Eq 'DEMO_ROUND_COUNT:int *= *10|DEMO_LAST_LEVEL:int *= *9' src/scripts/main.gd
-          grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
-          test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
           rm -rf bobble40-web && mkdir bobble40-web
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path src
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path src --export-release Web "$GITHUB_WORKSPACE/bobble40-web/index.html"
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
-          sed -i 's#<title>[^<]*</title>#<title>Bobble40</title>#' bobble40-web/index.html
+          sed -i 's#<title>[^<]*</title>#<title>Bubble Bobble: Big 40!</title>#' bobble40-web/index.html
+          grep -q 'Bubble Bobble: Big 40!' bobble40-web/index.html
 
-      - name: Publish browser files
+      - name: Deploy exact Bubble Bobble build to Netlify
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-web 2>&1 | tee netlify-output.txt
+          URL=$(grep -Eo 'https?://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          test -n "$URL"
+          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
+          echo "BOBBLE40_URL=$URL" >> "$GITHUB_ENV"
+          curl -L --fail --retry 5 "$URL" | grep -q 'Bubble Bobble: Big 40!'
+
+      - name: Save verified build and URL
         shell: bash
         run: |
           set -euxo pipefail
@@ -72,6 +85,6 @@ jobs:
           rm -rf web/bobble40
           mkdir -p web/bobble40
           cp -a bobble40-web/. web/bobble40/
-          git add -f web/bobble40
-          git commit -m 'Publish Bobble40 10-round web demo' || exit 0
-          git push
+          git add -f web/bobble40 BOBBLE40_NETLIFY_URL.txt
+          git commit -m 'Publish verified Bubble Bobble 40 mobile web build' || exit 0
+          git push origin HEAD:bobble40-build
