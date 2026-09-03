@@ -100,3 +100,5 @@ jobs:
           git add -f bobble40
           git commit -m 'Publish verified Bubble Bobble Big 40 mobile web build' || exit 0
           git push origin HEAD:bobble40-build
+
+# repaired relay ready
