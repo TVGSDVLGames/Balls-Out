@@ -1,4 +1,4 @@
-name: Deploy Bobble40 Mobile Web
+name: Build Correct Bobble40 Public Web
 
 on:
   push:
@@ -11,52 +11,86 @@ permissions:
   contents: write
 
 jobs:
-  deploy-bobble40:
+  build-bobble40:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: bobble40-build
 
-      - name: Verify exact compiled Bubble Bobble web build
+      - name: Recover actual Bubble Bobble source
         shell: bash
         run: |
           set -euxo pipefail
-          test -s web/index.html
-          test -s web/index.js
-          test -s web/index.wasm
-          test -s web/index.pck
-          test "$(stat -c%s web/index.wasm)" = 39513091
-          test "$(stat -c%s web/index.pck)" = 8653864
-          rm -rf bobble40-live
-          cp -a web bobble40-live
+          cat bobble40-live-relay2/r* > relay.b64
+          base64 -d relay.b64 > bobble40.tar.xz
+          rm -rf bobble40-src
+          mkdir bobble40-src
+          tar -xJf bobble40.tar.xz -C bobble40-src
+          PROJ=$(find bobble40-src -name project.godot -print -quit)
+          test -n "$PROJ"
+          PROJDIR=$(dirname "$PROJ")
+          echo "$PROJDIR" > project-dir.txt
+          test -s "$PROJDIR/scripts/main.gd"
+          grep -q 'DEMO_LAST_LEVEL' "$PROJDIR/scripts/main.gd"
+          grep -q 'THANK YOU FOR PLAYING' "$PROJDIR/scripts/main.gd"
+          grep -q '_build_mobile_controls' "$PROJDIR/scripts/main.gd"
+
+      - name: Download Godot 4.7.1
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q godot.zip -d godot-bin
+          GODOT=$(find godot-bin -type f -name 'Godot_v4.7.1-stable_linux.x86_64' -print -quit)
+          test -n "$GODOT"
+          chmod +x "$GODOT"
+          echo "$GODOT" > godot-path.txt
+
+      - name: Build Bubble Bobble PCK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GODOT=$(cat godot-path.txt)
+          PROJDIR=$(cat project-dir.txt)
+          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path "$PROJDIR"
+          rm -rf bobble40-public
+          mkdir bobble40-public
+          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path "$PROJDIR" --export-pack Web "$GITHUB_WORKSPACE/bobble40-public/index.pck"
+          test -s bobble40-public/index.pck
+
+      - name: Add generic Godot browser runtime
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do
+            cp "web/$f" "bobble40-public/$f"
+          done
           python3 - <<'PY'
           from pathlib import Path
           import re
-          p=Path('bobble40-live/index.html')
+          p=Path('bobble40-public/index.html')
           s=p.read_text()
-          s=re.sub(r'<title>.*?</title>','<title>Bubble Bobble: Big 40!</title>',s,flags=re.S)
+          size=Path('bobble40-public/index.pck').stat().st_size
+          s,n=re.subn(r'("index\\.pck"\\s*:\\s*)\\d+',rf'\\g<1>{size}',s)
+          if n != 1:
+              raise SystemExit(f'PCK size patch count={n}')
+          s=re.sub(r'<title>.*?</title>','<title>Bobble40</title>',s,flags=re.S)
           if 'viewport-fit=cover' not in s:
               s=s.replace('width=device-width, user-scalable=no, initial-scale=1.0','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover')
           p.write_text(s)
+          print('Bubble Bobble PCK size', size)
           PY
+          grep -q '<title>Bobble40</title>' bobble40-public/index.html
 
-      - name: Deploy exact Bubble Bobble mobile build to Netlify
+      - name: Publish public no-password build
         shell: bash
         run: |
           set -euxo pipefail
-          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-live 2>&1 | tee netlify-output.txt
-          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
-          test -n "$URL"
-          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
-          curl -L --fail --retry 5 "$URL" | grep -q 'Bubble Bobble: Big 40!'
-
-      - name: Save live URL
-        shell: bash
-        run: |
-          set -euxo pipefail
-          git config user.name 'github-actions'
-          git config user.email 'github-actions@github.com'
-          git add BOBBLE40_NETLIFY_URL.txt
-          git commit -m 'Save live Bubble Bobble mobile URL' || true
-          git push origin HEAD:bobble40-build || true
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          rm -rf bobble40
+          mv bobble40-public bobble40
+          git add -f bobble40
+          git commit -m 'Publish correct Bubble Bobble Big 40 mobile web build'
+          git push origin HEAD:bobble40-build
