@@ -1,0 +1,51 @@
+name: Deploy Bobble40 to Netlify
+
+on:
+  push:
+    branches:
+      - bobble40-final-live-9
+    paths:
+      - '.github/workflows/deploy-bobble40-netlify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bobble40-final-live-9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Bubble Bobble web payload
+        run: |
+          test -f web/index.html
+          test -f web/index.wasm
+          test -f web/index.pck
+          grep -qi 'Bubble Bobble' README.md || true
+          ls -lh web
+      - name: Deploy anonymously to Netlify
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=web 2>&1 | tee netlify-output.txt
+          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          if [ -z "$URL" ]; then
+            echo 'Could not extract Netlify URL' >&2
+            cat netlify-output.txt >&2
+            exit 1
+          fi
+          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Save deployed URL to branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add BOBBLE40_NETLIFY_URL.txt
+          git commit -m 'Record Bubble Bobble Netlify URL' || exit 0
+          git push origin HEAD:bobble40-final-live-9
