@@ -92,16 +92,28 @@ jobs:
           PY
           grep -q '<title>Bobble40</title>' bobble40/index.html
 
-      - name: Commit playable Bobble40 site
+      - name: Deploy exact Bobble40 build to Netlify
+        id: netlify
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40 2>&1 | tee netlify-output.txt
+          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          test -n "$URL"
+          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          curl -L --fail --retry 5 "$URL" | grep -q 'Bobble40'
+
+      - name: Commit playable Bobble40 site and Netlify URL
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name 'github-actions'
           git config user.email 'github-actions@github.com'
-          git add -f bobble40
+          git add -f bobble40 BOBBLE40_NETLIFY_URL.txt
           if git diff --cached --quiet; then
             echo 'Bobble40 web build already current.'
           else
-            git commit -m 'Publish playable Bobble40 web demo'
+            git commit -m 'Publish playable Bobble40 web demo and Netlify URL'
             git push origin HEAD:bobble40-build
           fi
