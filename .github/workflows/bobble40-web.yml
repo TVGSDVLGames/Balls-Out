@@ -1,97 +1,19 @@
-name: Build Correct Bobble40 Public Web
-
+name: Check Bobble40 Relay
 on:
   push:
     branches: [bobble40-build]
-    paths:
-      - '.github/workflows/bobble40-web.yml'
-  workflow_dispatch:
-
+    paths: ['.github/workflows/bobble40-web.yml']
 permissions:
   contents: write
-
 jobs:
-  build-bobble40:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: bobble40-build
-
-      - name: Recover verified Bubble Bobble source
-        shell: bash
+      - shell: bash
         run: |
-          set -euxo pipefail
-          : > relay.b64
-          for i in {00..19}; do tr -d '\r\n' < "bobble40-live-relay2/r$i" | head -c 19950 >> relay.b64; done
-          tr -d '\r\n' < bobble40-live-relay2/r20 | head -c 15912 >> relay.b64
-          test "$(stat -c%s relay.b64)" = 414912
-          base64 -d relay.b64 > bobble40.tar.xz
-          test "$(stat -c%s bobble40.tar.xz)" = 311184
-          echo '4ebf4899f95a19cb7cfe007ff385a5501168dca7c1ce7306cb894bd176a6d82c  bobble40.tar.xz' | sha256sum -c -
-          rm -rf bobble40-src
-          mkdir bobble40-src
-          tar -xJf bobble40.tar.xz -C bobble40-src
-          PROJ=$(find bobble40-src -name project.godot -print -quit)
-          test -n "$PROJ"
-          PROJDIR=$(dirname "$PROJ")
-          echo "$PROJDIR" > project-dir.txt
-          test -s "$PROJDIR/scripts/main.gd"
-          grep -q 'DEMO_ROUND_COUNT:int = 10' "$PROJDIR/scripts/main.gd"
-          grep -q 'THANK YOU FOR PLAYING!' "$PROJDIR/scripts/main.gd"
-          grep -q 'DisplayServer.is_touchscreen_available()' "$PROJDIR/scripts/main.gd"
-          test "$(find "$PROJDIR" -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
-
-      - name: Install Godot 4.7.1 and Web templates
-        shell: bash
-        run: |
-          set -euxo pipefail
-          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          curl -L --fail --retry 3 -o templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
-          unzip -q godot.zip -d godot-bin
-          GODOT=$(find godot-bin -type f -name 'Godot_v4.7.1-stable_linux.x86_64' -print -quit)
-          test -n "$GODOT"
-          chmod +x "$GODOT"
-          echo "$GODOT" > godot-path.txt
-          TPL="$HOME/.local/share/godot/export_templates/4.7.1.stable"
-          mkdir -p "$TPL"
-          rm -rf tpl-unpack && mkdir tpl-unpack
-          unzip -q templates.tpz -d tpl-unpack
-          cp -a tpl-unpack/templates/. "$TPL/"
-          test -s "$TPL/web_nothreads_release.zip"
-
-      - name: Export actual Bubble Bobble Web build
-        shell: bash
-        run: |
-          set -euxo pipefail
-          GODOT=$(cat godot-path.txt)
-          PROJDIR=$(cat project-dir.txt)
-          rm -rf bobble40-public
-          mkdir bobble40-public
-          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path "$PROJDIR"
-          GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path "$PROJDIR" --export-release Web "$GITHUB_WORKSPACE/bobble40-public/index.html"
-          test -s bobble40-public/index.html
-          test -s bobble40-public/index.pck
-          test -s bobble40-public/index.wasm
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p=Path('bobble40-public/index.html')
-          s=p.read_text()
-          s=re.sub(r'<title>.*?</title>','<title>Bobble40</title>',s,flags=re.S)
-          if 'viewport-fit=cover' not in s:
-              s=s.replace('width=device-width, user-scalable=no, initial-scale=1.0','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover')
-          p.write_text(s)
-          PY
-
-      - name: Publish public no-password build
-        shell: bash
-        run: |
-          set -euxo pipefail
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          rm -rf bobble40
-          mv bobble40-public bobble40
-          git add -f bobble40
-          git commit -m 'Publish verified Bubble Bobble Big 40 mobile web build' || exit 0
-          git push origin HEAD:bobble40-build
+          set -x
+          for i in 09 15 19; do tr -d '\r\n' < bobble40-live-relay2/r$i | head -c 19950 | sha256sum; done
+          exit 1
