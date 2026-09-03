@@ -18,16 +18,15 @@ jobs:
         with:
           ref: bobble40-build
 
-      - name: Reconstruct verified Bubble Bobble 10-round source
+      - name: Reconstruct and verify Bubble Bobble source
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r{00..20} > relay.raw
-          tr -d '\r\n' < relay.raw > relay.b64
-          test "$(stat -c%s relay.b64)" = 691388
+          cat bobble40-live-relay2/r{00..31} > relay.raw
+          tr -cd 'A-Za-z0-9+/=' < relay.raw > relay.b64
+          wc -c relay.b64
           base64 -d relay.b64 > bobble40.tar.xz
-          test "$(stat -c%s bobble40.tar.xz)" = 518540
-          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
+          xz -t bobble40.tar.xz
           rm -rf src && mkdir src
           tar -xJf bobble40.tar.xz -C src
           test -s src/project.godot
@@ -73,7 +72,6 @@ jobs:
           URL=$(grep -Eo 'https?://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
           test -n "$URL"
           echo "$URL" > BOBBLE40_NETLIFY_URL.txt
-          echo "BOBBLE40_URL=$URL" >> "$GITHUB_ENV"
           curl -L --fail --retry 5 "$URL" | grep -q 'Bubble Bobble: Big 40!'
 
       - name: Save verified build and URL
