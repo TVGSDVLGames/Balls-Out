@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euxo pipefail
           cat bobble40-live-relay2/r{00..20} > relay.b64
-          test "$(stat -c%s relay.b64)" = 418950
+          test "$(stat -c%s relay.b64)" = 691388
           base64 -d relay.b64 > bobble40.tar.xz
-          test "$(stat -c%s bobble40.tar.xz)" = 314211
+          test "$(stat -c%s bobble40.tar.xz)" = 518540
           echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
           mkdir src
           tar -xJf bobble40.tar.xz -C src
