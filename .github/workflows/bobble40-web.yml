@@ -22,7 +22,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r{00..20} > relay.b64
+          : > relay.b64
+          for i in {00..19}; do tr -d '\r\n' < "bobble40-live-relay2/r$i" | head -c 19950 >> relay.b64; done
+          tr -d '\r\n' < bobble40-live-relay2/r20 | head -c 15912 >> relay.b64
           test "$(stat -c%s relay.b64)" = 414912
           base64 -d relay.b64 > bobble40.tar.xz
           test "$(stat -c%s bobble40.tar.xz)" = 311184
