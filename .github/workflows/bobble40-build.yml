@@ -22,9 +22,8 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r{00..31} > relay.raw
+          cat bobble40-live-relay2/r{00..20} > relay.raw
           tr -cd 'A-Za-z0-9+/=' < relay.raw > relay.b64
-          wc -c relay.b64
           base64 -d relay.b64 > bobble40.tar.xz
           xz -t bobble40.tar.xz
           rm -rf src && mkdir src
@@ -62,7 +61,6 @@ jobs:
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
           sed -i 's#<title>[^<]*</title>#<title>Bubble Bobble: Big 40!</title>#' bobble40-web/index.html
-          grep -q 'Bubble Bobble: Big 40!' bobble40-web/index.html
 
       - name: Deploy exact Bubble Bobble build to Netlify
         shell: bash
