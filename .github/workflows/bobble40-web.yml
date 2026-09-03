@@ -117,3 +117,5 @@ jobs:
             git commit -m 'Publish playable Bobble40 web demo and Netlify URL'
             git push origin HEAD:bobble40-build
           fi
+
+# retrigger exact Bubble Bobble mobile web build 2026-09-03
