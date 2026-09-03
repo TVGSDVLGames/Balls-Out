@@ -21,8 +21,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r{00..19} > relay.b64
-          tr -d '\r\n ' < relay.b64 > relay.clean.b64
+          : > relay.clean.b64
+          for n in $(seq -w 0 19); do
+            head -c 19950 "bobble40-live-relay2/r${n}" >> relay.clean.b64
+          done
+          test "$(stat -c%s relay.clean.b64)" = 399000
           base64 -d relay.clean.b64 > bobble40.tar.xz
           xz -t bobble40.tar.xz
           rm -rf src && mkdir src
@@ -59,8 +62,21 @@ jobs:
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
+          sed -i 's#<title>[^<]*</title>#<title>Bobble40</title>#' bobble40-web/index.html
 
-      - name: Publish browser files
+      - name: Deploy exact Bubble Bobble build to Netlify
+        id: netlify
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-web 2>&1 | tee netlify-output.txt
+          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          test -n "$URL"
+          echo "$URL" > BOBBLE40_NETLIFY_URL.txt
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          curl -L --fail --retry 5 "$URL" | grep -q 'Bobble40'
+
+      - name: Publish browser files and Netlify URL
         shell: bash
         run: |
           set -euxo pipefail
@@ -69,6 +85,6 @@ jobs:
           rm -rf web/bobble40
           mkdir -p web/bobble40
           cp -a bobble40-web/. web/bobble40/
-          git add web/bobble40
-          git commit -m 'Publish Bobble40 10-round web demo' || exit 0
+          git add -f web/bobble40 BOBBLE40_NETLIFY_URL.txt
+          git commit -m 'Publish Bobble40 10-round web demo to Netlify' || exit 0
           git push
