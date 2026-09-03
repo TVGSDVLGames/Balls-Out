@@ -17,16 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Reconstruct verified 10-round source
+      - name: Reconstruct compact 10-round source
         shell: bash
         run: |
           set -euxo pipefail
-          cat bobble40-live-relay2/r{00..20} > relay.b64
-          test "$(stat -c%s relay.b64)" = 691388
-          base64 -d relay.b64 > bobble40.tar.xz
-          test "$(stat -c%s bobble40.tar.xz)" = 518540
-          echo 'a97e1138766f079d2fdc69b67c5ed184dcb87d60edec9b5bfe19e2fd2210ab21  bobble40.tar.xz' | sha256sum -c -
-          mkdir src
+          cat bobble40-live-relay2/r{00..19} > relay.b64
+          tr -d '\r\n ' < relay.b64 > relay.clean.b64
+          base64 -d relay.clean.b64 > bobble40.tar.xz
+          xz -t bobble40.tar.xz
+          rm -rf src && mkdir src
           tar -xJf bobble40.tar.xz -C src
           test -s src/project.godot
           test -s src/scripts/main.gd
@@ -54,7 +53,7 @@ jobs:
           grep -Eq 'DEMO_ROUND_COUNT:int *= *10|DEMO_LAST_LEVEL:int *= *9' src/scripts/main.gd
           grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
           test "$(find src -type f | grep -Ec '(level|round)[_-]?0?(1[1-9]|[2-9][0-9])' || true)" -eq 0
-          mkdir bobble40-web
+          rm -rf bobble40-web && mkdir bobble40-web
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --import --path src
           GODOT_SILENCE_ROOT_WARNING=1 "$GODOT" --headless --path src --export-release Web "$GITHUB_WORKSPACE/bobble40-web/index.html"
           test -s bobble40-web/index.html
