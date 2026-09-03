@@ -18,18 +18,19 @@ jobs:
         with:
           ref: bobble40-final-live-9
 
-      - name: Extract Bubble Bobble source payload
+      - name: Reconstruct Bubble Bobble source from verified relay
         shell: bash
         run: |
           set -euxo pipefail
-          file bobble40-source.tar.xz
+          cat bobble40-relay-final19/f00 bobble40-relay-final19/f01 bobble40-relay-final19/f02 bobble40-relay-final19/f03 bobble40-relay-final19/f04 bobble40-relay-final19/f05 bobble40-relay-final19/f06 bobble40-relay-final19/f07 bobble40-relay-final19/f08 bobble40-relay-final19/f09 bobble40-relay-final19/f10 | tr -cd 'A-Za-z0-9+/=' | base64 -d > bobble40-source-fixed.tar.xz
+          xz -t bobble40-source-fixed.tar.xz
           rm -rf src
           mkdir src
-          tar -xJf bobble40-source.tar.xz -C src
-          find src -maxdepth 3 -type f | sort | head -200
+          tar -xJf bobble40-source-fixed.tar.xz -C src
           test -s src/project.godot
           test -s src/scripts/main.gd
           grep -q 'THANK YOU FOR PLAYING' src/scripts/main.gd
+          grep -qi 'bubble\|bobble' src/project.godot src/scripts/main.gd
 
       - name: Download Godot 4.7.1 and web templates
         shell: bash
@@ -46,7 +47,7 @@ jobs:
           unzip -j templates.tpz 'templates/web_nothreads_release.zip' -d "$TPL"
           printf '4.7.1.stable\n' > "$TPL/version.txt"
 
-      - name: Export Bubble Bobble web build
+      - name: Export Bubble Bobble mobile web build
         shell: bash
         run: |
           set -euxo pipefail
@@ -57,21 +58,21 @@ jobs:
           test -s bobble40-web/index.html
           test -s bobble40-web/index.pck
           test -s bobble40-web/index.wasm
-          sed -i 's#<title>[^<]*</title>#<title>Bobble40</title>#' bobble40-web/index.html
-          grep -q 'Bobble40' bobble40-web/index.html
-          ls -lh bobble40-web
+          sed -i 's#<title>[^<]*</title>#<title>Bubble Bobble: Big 40!</title>#' bobble40-web/index.html
+          grep -q 'Bubble Bobble: Big 40!' bobble40-web/index.html
 
       - name: Deploy Bubble Bobble to Netlify
         shell: bash
         run: |
           set -euxo pipefail
           npx --yes netlify-cli@latest deploy --allow-anonymous --dir=bobble40-web 2>&1 | tee netlify-output.txt
-          URL=$(grep -Eo 'https://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
+          URL=$(grep -Eo 'https?://[-a-zA-Z0-9.]+\.netlify\.app' netlify-output.txt | tail -n 1)
           test -n "$URL"
           echo "$URL" > BOBBLE40_NETLIFY_URL.txt
-          curl -L --fail --retry 5 "$URL" | grep -q 'Bobble40'
+          curl -L --fail --retry 5 "$URL" | grep -q 'Bubble Bobble: Big 40!'
+          echo "LIVE_URL=$URL"
 
-      - name: Save Bubble Bobble build and URL
+      - name: Save exact Bubble Bobble build and URL
         shell: bash
         run: |
           set -euxo pipefail
@@ -80,5 +81,5 @@ jobs:
           rm -rf bobble40
           mv bobble40-web bobble40
           git add -f bobble40 BOBBLE40_NETLIFY_URL.txt
-          git commit -m 'Publish Bubble Bobble 40 web build to Netlify' || exit 0
+          git commit -m 'Publish correct Bubble Bobble 40 mobile web build' || exit 0
           git push origin HEAD:bobble40-final-live-9
