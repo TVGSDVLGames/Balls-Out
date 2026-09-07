@@ -1,0 +1,27 @@
+name: fetch-pennywise-reference
+on:
+  push:
+    paths:
+      - '.github/workflows/fetch-pennywise-reference.yml'
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download selected front-facing Pennywise reference
+        run: |
+          python - <<'PY'
+          import urllib.request
+          url='https://www.looper.com/img/gallery/what-these-movie-monsters-look-like-without-makeup/l-intro-1612993230.jpg'
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+          with urllib.request.urlopen(req,timeout=30) as r:
+              data=r.read()
+          open('pennywise_front.jpg','wb').write(data)
+          print('downloaded',len(data))
+          PY
+          file pennywise_front.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pennywise-front-reference
+          path: pennywise_front.jpg
+          if-no-files-found: error
