@@ -1,0 +1,32 @@
+name: fetch-penny-head
+on:
+  push:
+    paths:
+      - '.github/workflows/fetch-penny-head.yml'
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download head reference
+        run: |
+          python - <<'PY'
+          import urllib.request
+          urls=[
+            'https://wallpapers.com/images/hd/pennywise-head-png-rvw-l89qsc40md82pnz6.jpg',
+            'https://pngpix.com/images/hd/it-movie-pennywise-png-79-aq1sdyjo3l6d81tv.jpg'
+          ]
+          for i,u in enumerate(urls):
+              try:
+                  req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+                  with urllib.request.urlopen(req,timeout=30) as r: data=r.read()
+                  open(f'head{i}.jpg','wb').write(data)
+                  print(i,len(data))
+              except Exception as e: print('ERR',i,e)
+          PY
+          file head*.jpg || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: penny-head-reference
+          path: head*.jpg
+          if-no-files-found: error
