@@ -1,0 +1,1 @@
+trigger clothed p66 enemy asset fetch
