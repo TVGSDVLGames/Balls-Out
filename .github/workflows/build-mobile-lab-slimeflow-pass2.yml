@@ -26,6 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC='mobile-lab-src/slimeflow/pass2'
+          sha256sum "$SRC"/index.pck.b64.*
           cat "$SRC"/index.pck.b64.* | base64 -d > /tmp/slimeflow-pass2.pck
           test "$(stat -c%s /tmp/slimeflow-pass2.pck)" = "21112"
           echo "dedb32f1907b11e2427aad63fb08f655e51c041d62d8466cb1164649773b6bef  /tmp/slimeflow-pass2.pck" | sha256sum -c -
