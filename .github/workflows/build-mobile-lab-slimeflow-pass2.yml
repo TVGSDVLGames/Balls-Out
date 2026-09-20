@@ -70,3 +70,5 @@ jobs:
           fi
           git commit -m 'Publish SlimeFlow PASS2 squish mobile lab'
           git push origin HEAD:main
+
+# rebuild after payload verification
