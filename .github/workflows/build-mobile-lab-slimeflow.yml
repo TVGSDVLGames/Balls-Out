@@ -1,0 +1,77 @@
+name: Build Mobile Lab - SlimeFlow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile-lab-src/slimeflow/pass1/**'
+      - '.github/workflows/build-mobile-lab-slimeflow.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-lab-slimeflow
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct SlimeFlow PASS1 PCK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC='mobile-lab-src/slimeflow/pass1'
+          cat "$SRC"/index.pck.b64.* | base64 -d > /tmp/slimeflow.pck
+          test "$(stat -c%s /tmp/slimeflow.pck)" = "17992"
+          echo "1bc4455ad4b81228b4580eb52fe83a93d24f26598b0ccba814145c07867fae43  /tmp/slimeflow.pck" | sha256sum -c -
+
+      - name: Build isolated iPhone web test
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT='web/lab/slimeflow/pass1'
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          BASE='https://raw.githubusercontent.com/TVGSDVLGames/Creature-Simulator/main/web'
+          for f in index.html index.js index.wasm index.audio.worklet.js index.audio.position.worklet.js index.png index.icon.png index.apple-touch-icon.png; do
+            curl -L --fail --retry 3 "$BASE/$f" -o "$OUT/$f"
+          done
+          cp /tmp/slimeflow.pck "$OUT/index.pck"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          out = Path('web/lab/slimeflow/pass1')
+          html = out / 'index.html'
+          s = html.read_text()
+          size = (out / 'index.pck').stat().st_size
+          s, n = re.subn(r'("index\.pck"\s*:\s*)\d+', rf'\g<1>{size}', s)
+          s = re.sub(r'<title>.*?</title>', '<title>SLIME FLOW - PASS1 Mobile Lab</title>', s, flags=re.S|re.I)
+          if n == 0:
+              print('No embedded PCK-size field; runtime loader does not require it.')
+          html.write_text(s)
+          PY
+
+          test -s "$OUT/index.html"
+          test -s "$OUT/index.js"
+          test -s "$OUT/index.wasm"
+          test -s "$OUT/index.pck"
+
+      - name: Commit isolated lab build
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f web/lab/slimeflow/pass1
+          if git diff --cached --quiet; then
+            echo 'Lab build already current.'
+            exit 0
+          fi
+          git commit -m 'Publish SlimeFlow PASS1 mobile lab'
+          git push origin HEAD:main
