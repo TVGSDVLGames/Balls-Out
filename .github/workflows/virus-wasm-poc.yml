@@ -1,0 +1,204 @@
+name: Virus WASM Proof of Life
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: virus-wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wasm-poc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Clone DSP56300 core
+        run: |
+          git clone --recursive --depth 1 --shallow-submodules \
+            https://github.com/dsp56300/dsp56300.git dsp56300
+
+      - name: Make upstream core Emscripten-safe
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Top-level: VTune is a native desktop profiler only.
+          p=Path('dsp56300/source/CMakeLists.txt')
+          s=p.read_text()
+          s=s.replace('if(WIN32 OR (UNIX AND NOT APPLE))\n\tadd_subdirectory(vtuneSdk)', 'if((WIN32 OR (UNIX AND NOT APPLE)) AND NOT EMSCRIPTEN)\n\tadd_subdirectory(vtuneSdk)')
+          p.write_text(s)
+
+          # Base library: GCC-only constexpr flag and Linux rt/pthread plumbing
+          # are not valid/needed for our single-threaded first WASM proof.
+          p=Path('dsp56300/source/dsp56kBase/CMakeLists.txt')
+          s=p.read_text()
+          s=s.replace('elseif(UNIX AND NOT APPLE)', 'elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)', 1)
+          s=s.replace('if(UNIX AND NOT APPLE)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 'if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 1)
+          p.write_text(s)
+
+          # execinfo/backtrace is a native Unix diagnostic facility, unavailable
+          # in browser WASM. Assertions still throw with their normal message.
+          p=Path('dsp56300/source/dsp56kBase/dspassert.cpp')
+          s=p.read_text()
+          s=s.replace('#ifndef ANDROID\n#define SUPPORT_BACKTRACE', '#if !defined(ANDROID) && !defined(__EMSCRIPTEN__)\n#define SUPPORT_BACKTRACE', 1)
+          p.write_text(s)
+
+          # Browser WASM has no Linux process/thread priority API or SYS_gettid.
+          # For this first single-threaded interpreter proof, priority changes are
+          # deliberately a successful no-op.
+          p=Path('dsp56300/source/dsp56kBase/threadtools.cpp')
+          s=p.read_text()
+          old='\tbool ThreadTools::setCurrentThreadPriority(ThreadPriority _priority)\n\t{\n#ifdef _WIN32'
+          new='\tbool ThreadTools::setCurrentThreadPriority(ThreadPriority _priority)\n\t{\n#ifdef __EMSCRIPTEN__\n\t\t(void)_priority;\n\t\treturn true;\n#elif defined(_WIN32)'
+          if old not in s:
+              raise SystemExit('ThreadTools priority pattern changed')
+          p.write_text(s.replace(old,new,1))
+
+          # Emulator library: same GCC-only constexpr flag, plus native-only
+          # VTune/perf/thread integration.
+          p=Path('dsp56300/source/dsp56kEmu/CMakeLists.txt')
+          s=p.read_text()
+          s=s.replace('if(WIN32 OR (UNIX AND NOT APPLE))\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)', 'if((WIN32 OR (UNIX AND NOT APPLE)) AND NOT EMSCRIPTEN)\n\ttarget_link_libraries(dsp56kEmu PUBLIC vtuneSdk)', 1)
+          s=s.replace('elseif(UNIX AND NOT APPLE)', 'elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)', 1)
+          s=s.replace('if(UNIX AND NOT APPLE)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 'if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)\n\tset(THREADS_PREFER_PTHREAD_FLAG ON)', 1)
+          p.write_text(s)
+
+          # Upstream has no third JIT architecture state. On an unknown host CPU,
+          # jittypes.h falls back to x86 while several other files fall back to ARM.
+          # For Emscripten only, make the dead JIT code compile consistently as x86.
+          # dspconfig.h below separately guarantees the JIT can never execute.
+          p=Path('dsp56300/source/dsp56kBase/buildconfig.h')
+          s=p.read_text()
+          s += '\n#ifdef __EMSCRIPTEN__\n#ifndef HAVE_X86_64\n#define HAVE_X86_64 1\n#endif\n#endif\n'
+          p.write_text(s)
+
+          # Even with the compile-only x86 type shim above, WebAssembly must always
+          # run the real interpreter. Never permit AsmJit/native code execution.
+          p=Path('dsp56300/source/dsp56kEmu/dspconfig.h')
+          s=p.read_text()
+          old='#if defined(HAVE_X86_64) || defined(HAVE_ARM64)\n\tconstexpr bool g_jitSupported = true;\n#else\n\tconstexpr bool g_jitSupported = false;\n#endif'
+          new='#if defined(__EMSCRIPTEN__)\n\tconstexpr bool g_jitSupported = false;\n#elif defined(HAVE_X86_64) || defined(HAVE_ARM64)\n\tconstexpr bool g_jitSupported = true;\n#else\n\tconstexpr bool g_jitSupported = false;\n#endif'
+          if old not in s:
+              raise SystemExit('dspconfig JIT support pattern changed')
+          p.write_text(s.replace(old,new,1))
+
+          # AsmJit is still compiled by upstream even though the DSP cannot use
+          # it on WASM. Avoid Emscripten lowering __builtin___clear_cache to the
+          # unsupported llvm.clear_cache intrinsic. This path is unreachable at
+          # runtime because g_jitSupported=false for WebAssembly.
+          p=Path('dsp56300/source/asmjit/src/asmjit/core/virtmem.cpp')
+          s=p.read_text()
+          old='void flushInstructionCache(void* p, size_t size) noexcept {\n#if ASMJIT_ARCH_X86'
+          new='void flushInstructionCache(void* p, size_t size) noexcept {\n#if defined(__EMSCRIPTEN__)\n  DebugUtils::unused(p, size);\n#elif ASMJIT_ARCH_X86'
+          if old not in s:
+              raise SystemExit('AsmJit flushInstructionCache pattern changed')
+          p.write_text(s.replace(old,new,1))
+          PY
+
+      - name: Add explicit interpreter register probe
+        shell: bash
+        run: |
+          cp virus-wasm/wasm_register_probe.cpp dsp56300/source/dsp56kTestRunner/wasmRegisterProbe.cpp
+          cat >> dsp56300/source/dsp56kTestRunner/CMakeLists.txt <<'EOF'
+
+          add_executable(wasmRegisterProbe wasmRegisterProbe.cpp)
+          target_link_libraries(wasmRegisterProbe PUBLIC dsp56kEmu)
+          EOF
+
+      - name: Configure WASM build
+        run: |
+          emcmake cmake -S dsp56300 -B build-wasm -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDSP56300_DEBUGGER=OFF
+
+      - name: Build interpreter tests and register probe as WASM
+        run: cmake --build build-wasm --target dsp56kTestRunner wasmRegisterProbe --parallel 3
+
+      - name: Locate WASM programs
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+          JS="$(find build-wasm -type f -name 'dsp56kTestRunner.js' | head -n1)"
+          WASM="${JS%.js}.wasm"
+          PROBE_JS="$(find build-wasm -type f -name 'wasmRegisterProbe.js' | head -n1)"
+          PROBE_WASM="${PROBE_JS%.js}.wasm"
+          test -n "$JS"
+          test -f "$WASM"
+          test -n "$PROBE_JS"
+          test -f "$PROBE_WASM"
+          echo "js=$JS" >> "$GITHUB_OUTPUT"
+          echo "wasm=$WASM" >> "$GITHUB_OUTPUT"
+          echo "probe_js=$PROBE_JS" >> "$GITHUB_OUTPUT"
+          echo "probe_wasm=$PROBE_WASM" >> "$GITHUB_OUTPUT"
+          ls -lh "$JS" "$WASM" "$PROBE_JS" "$PROBE_WASM"
+
+      - name: Run DSP tests under Node
+        run: |
+          node "${{ steps.locate.outputs.js }}" | tee "$GITHUB_WORKSPACE/wasm-test-output.txt"
+
+      - name: Run explicit register mutation proof under Node
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "${{ steps.locate.outputs.probe_js }}" | tee "$GITHUB_WORKSPACE/wasm-register-probe.txt"
+          grep -F 'WASM_INTERPRETER_REGISTER_PROBE_OK X0=$00005a' "$GITHUB_WORKSPACE/wasm-register-probe.txt"
+
+      - name: Package browser proof
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p virus-wasm-poc
+          cp "${{ steps.locate.outputs.js }}" virus-wasm-poc/dsp56kTestRunner.js
+          cp "${{ steps.locate.outputs.wasm }}" virus-wasm-poc/dsp56kTestRunner.wasm
+          cp "${{ steps.locate.outputs.probe_js }}" virus-wasm-poc/wasmRegisterProbe.js
+          cp "${{ steps.locate.outputs.probe_wasm }}" virus-wasm-poc/wasmRegisterProbe.wasm
+          cp wasm-test-output.txt wasm-register-probe.txt virus-wasm-poc/
+          cat > virus-wasm-poc/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>DSP56300 WASM Proof</title>
+          <style>body{font-family:system-ui;background:#111;color:#eee;max-width:760px;margin:40px auto;padding:20px}pre{white-space:pre-wrap;background:#1b1b1b;padding:16px;border-radius:10px}.ok{color:#65e572}</style>
+          <h1>DSP56300 WebAssembly Proof</h1>
+          <p class="ok">The real upstream DSP56300 interpreter has been compiled to WebAssembly.</p>
+          <p>The explicit proof executes <code>move #$5a,x0</code> through the normal DSP dispatcher and verifies X0 became $00005A. No Access Virus firmware is included.</p>
+          <h2>Register mutation proof</h2><pre id="probe">Loading…</pre>
+          <h2>Full DSP tests</h2><pre id="out">Loading…</pre>
+          <script>
+          fetch('wasm-register-probe.txt').then(r=>r.text()).then(t=>probe.textContent=t).catch(e=>probe.textContent=String(e));
+          fetch('wasm-test-output.txt').then(r=>r.text()).then(t=>out.textContent=t).catch(e=>out.textContent=String(e));
+          </script>
+          </html>
+          EOF
+          cat > virus-wasm-poc/README.txt <<'EOF'
+          DSP56300 WEBASSEMBLY INTERPRETER PROOF
+          ======================================
+          Upstream DSP56300 interpreter/test runner compiled with Emscripten
+          and executed successfully under Node/WebAssembly.
+
+          The dedicated wasmRegisterProbe executes the real DSP56300 opcode
+          'move #$5a,x0' through DSP::exec() and fails unless X0 == $00005A.
+
+          This contains NO Access Virus firmware.
+          Next milestone: compile Gearmulator virusLib/device layer into the
+          same WASM target and accept a user-supplied Virus C ROM at runtime.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: virus-wasm-poc
+          path: virus-wasm-poc
+          if-no-files-found: error
