@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#181818">
+<title>DM3AG Rhythm Lab — Final Polish</title>
+<style>
+:root{--case:#d8d2c4;--edge:#8d887e;--ink:#141414;--panel:#262626;--lcd:#a3b69a;--lcdink:#18281b;--red:#ae332c;--amber:#d59b25;--pad:#151515}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#101010;color:#eee;font-family:Arial,Helvetica,sans-serif;touch-action:manipulation}
+.machine{width:min(1200px,100%);margin:auto;background:var(--case);color:var(--ink);min-height:100vh;padding:10px;border-inline:5px solid var(--edge)}
+.header{display:flex;justify-content:space-between;gap:10px;align-items:end}
+.brand{font-size:clamp(25px,5vw,48px);font-weight:950;letter-spacing:.04em}
+.modelname{text-align:right;font-weight:900;font-size:clamp(15px,2.5vw,25px)}
+.sub{font-size:10px;font-weight:800;opacity:.72}
+.panel{margin-top:8px;background:var(--panel);color:#eee;border:3px solid #111;border-radius:5px;padding:9px;box-shadow:inset 0 0 0 1px #555}
+.modelBtns{display:flex;gap:6px;flex-wrap:wrap;
