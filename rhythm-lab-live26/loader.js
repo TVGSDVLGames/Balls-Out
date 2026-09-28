@@ -3,14 +3,21 @@
   for(let i=0;i<23;i++){
     const n=String(i).padStart(3,'0');
     const r=await fetch('chunks/'+n+'.txt',{cache:'no-store'});
-    if(!r.ok) throw new Error('chunk '+n+' '+r.status);
+    if(!r.ok) throw new Error('app payload '+n+' '+r.status);
     a.push(await r.text());
     const f=document.getElementById('f'),m=document.getElementById('m');
     if(f) f.style.width=((i+1)/23*100)+'%';
     if(m) m.textContent=(i+1)+' / 23';
   }
   let h=a.join('');
-  if(!h.startsWith('<!doctype html>')) throw new Error('assembled HTML invalid');
+  if(!h.startsWith('<!doctype html>')) throw new Error('assembled app payload invalid');
+  const rb=h.indexOf('const ROM_B64');
+  if(rb<0) throw new Error('embedded ROM bundle missing');
+  const romSection=h.slice(rb,Math.min(h.length,rb+4300000));
+  for(const k of ['"hr16":','"hr16b":','"sr16":']){
+    if(!romSection.includes(k)) throw new Error('embedded ROM missing: '+k.replace(/[":]/g,''));
+  }
+  if(!h.includes('bytes:1048576')||!h.includes('verifyEmbeddedRoms')) throw new Error('ROM integrity verifier missing');
   h=h.replace('</head>','<link rel="stylesheet" href="pass27.css"></head>');
   h=h.replace('</body>','<script src="pass27.js"></'+'script></body>');
   document.open();
