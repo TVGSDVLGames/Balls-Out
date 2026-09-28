@@ -1,0 +1,38 @@
+
+html,body{max-width:100%;overflow-x:hidden}
+#iosAudioGate{display:none;position:fixed;inset:0;z-index:2147483000;background:rgba(6,9,13,.96);align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e7eef3;text-align:center}
+body.iosAudioLocked #iosAudioGate{display:flex}
+.iosAudioCard{width:min(420px,92vw);background:#151b21;border:1px solid #36424c;border-radius:16px;padding:22px 18px 18px;box-shadow:0 24px 80px #000b}
+.iosAudioCard h2{margin:0 0 8px;font-size:24px;line-height:1.1}.iosAudioCard p{margin:0 0 15px;color:#aeb9c2;font-size:14px;line-height:1.45}
+#iosAudioStart{width:100%;min-height:58px;border:1px solid #70c8ef;border-radius:10px;background:#15384a;color:#eaf8ff;font:800 16px/1 system-ui;letter-spacing:.04em;box-shadow:inset 0 0 0 1px #73c8ef33}
+#iosAudioStart:active{transform:translateY(1px);background:#1b4a61}.iosAudioState{margin-top:11px;min-height:18px;color:#7ed88b;font:700 11px/1.3 ui-monospace,monospace}
+@media(max-width:900px){
+html,body,.desktopApp,.appMain,.appContent,.machine,.panel,.productView{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}
+body{overflow-x:hidden!important}.appContent{overflow-x:hidden!important}
+.panel{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"models" "lcd" "transport" "primary" "seqtools" "pads" "editor" "seq"!important;gap:6px!important}
+.modelBtns{grid-area:models!important}.lcd{grid-area:lcd!important}.transport{grid-area:transport!important}.primaryTools{grid-area:primary!important}.dev10{grid-area:seqtools!important}.pads{grid-area:pads!important}.editor{grid-area:editor!important}.seqwrap{grid-area:seq!important}
+.p20HardwareKeys,.p20LeftKeys,.p20RightKeys,.p20Faders,.p20DataWheel,.hwpanel,.stats{display:none!important}
+.seqwrap{display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain!important;padding:6px!important;box-sizing:border-box!important}
+.seq{display:grid!important;width:max-content!important;min-width:max-content!important;max-width:none!important}
+#regressionBtn,#traceBtn,#traceStat{display:none!important}
+.dev10{grid-template-columns:auto 78px repeat(3,minmax(0,1fr))!important}
+.editor,.editor .row,.pads{width:100%!important;min-width:0!important}
+}
+@media(max-width:760px) and (orientation:portrait){
+.appMain{grid-template-columns:minmax(0,1fr)!important}.appSidebar{width:100%!important;max-width:100%!important;min-width:0!important}.panel{padding:6px!important}
+.pads{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;padding:6px!important}.pad{min-width:0!important;min-height:82px!important}
+.transport{grid-template-columns:repeat(2,minmax(0,1fr))!important}.transport label{grid-column:1/-1!important}
+.primaryTools{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}.primaryTools>b,.primaryTools .p25HelpHint{grid-column:1/-1!important}
+.dev10{display:grid!important;grid-template-columns:1fr 90px 1fr 1fr!important}.dev10>b{grid-column:1/-1!important}
+.editor .row{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:6px!important}.editor label{width:100%!important;grid-template-columns:52px minmax(0,1fr) 34px!important}
+.seq .hdr,.step{min-width:34px!important;max-width:34px!important;box-sizing:border-box!important}.seq .lab{min-width:76px!important;max-width:76px!important;box-sizing:border-box!important}.appStatusbar{max-width:100vw!important}
+}
+@media(max-height:600px) and (orientation:landscape){
+.appMain{grid-template-columns:58px minmax(0,1fr)!important}
+.panel{grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"models" "lcd" "transport" "primary" "seqtools" "pads" "editor" "seq"!important;padding:5px!important}
+.p20HardwareKeys,.p20LeftKeys,.p20RightKeys,.p20Faders,.p20DataWheel,.stats,.hwpanel{display:none!important}
+.pads{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important}.pad{min-width:0!important;min-height:64px!important}
+.transport{grid-template-columns:repeat(3,minmax(0,1fr))!important}.transport label{grid-column:span 3!important}
+.editor .row{grid-template-columns:1fr 1fr!important}.editor label{grid-column:1/-1!important}
+.seqwrap{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important}.seq{width:max-content!important;min-width:max-content!important}
+}
