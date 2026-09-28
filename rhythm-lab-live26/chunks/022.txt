@@ -1,0 +1,243 @@
+IDI;$('midiStat').textContent=`MIDI ON • ${midiAccess.inputs.size} INPUT(S)`;};}catch(e){$('midiStat').textContent='MIDI DENIED';}}
+function onMIDI(ev){if(!midiEnabled)return;const [st,d1,d2]=ev.data,ch=(st&15)+1,type=st&0xF0,want=+$('midiChan').value;if(want&&ch!==want)return;if(type===0x90&&d2>0){let i=d1>=36&&d1<36+padState.length?d1-36:d1%padState.length;if(i>=0&&i<padState.length){selectedPad=i;syncEditor();triggerPad(i,d2);}}}
+$('midiBtn').onclick=enableMIDI;window.addEventListener('keydown',e=>{if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();exportKit();return;}const map='1234567890qwerty',i=map.indexOf(e.key.toLowerCase());if(i>=0&&i<padState.length){selectedPad=i;syncEditor();triggerPad(i,e.shiftKey?127:108);}});
+
+
+$('patternLen').onchange=e=>{pushHistory();patternLength=+e.target.value;renderSeq();};
+$('copyBarBtn').onclick=copyBar;$('pasteBarBtn').onclick=pasteBar;$('dupBarBtn').onclick=duplicateBar;$('clearBarBtn').onclick=clearBar;$('regressionBtn').onclick=runRegression;$('traceBtn').onclick=dumpSRTrace;
+document.querySelectorAll(".modelBtn").forEach(b=>b.classList.toggle("active",b.dataset.model===k));
+ $("modelTitle").textContent=model.display;$("modelSub").textContent=k==="sr16"?"12-PAD DRUM MACHINE":"16-PAD DRUM MACHINE";$("modelStat").textContent=model.display;
+ $("crcStat").textContent=model.crc;
+ $("sourceStat").textContent="BUILT IN";
+ $("accuracyNote").textContent=k==="sr16"
+ ? "SR-16: all 233 public sound names and ROM start descriptors are parsed directly from v1.04 firmware. DEV8 preserves every descriptor byte, applies b4 as a strongly-derived per-component DM3AG pitch code, and keeps b1/b5/b6/b7 raw until command-writer tracing proves their meanings."
+ : `${model.display}: voice names and sample start addresses are paired directly from the machine OS table. No ROM-block-order guessing.`;
+ resetPads();fillVoiceSelect();renderPads();renderSeq();syncEditor();
+ currentRomBytes=null;
+ currentRomKey=null;
+ if(engineReady && !IS_IOS && engine)engine.setRom(getCurrentRom());
+ lcd(`${model.display} READY`,k==="sr16"?"12 PADS • KIT 01 • PATTERN 01":"16 PADS • KIT 01 • PATTERN 01");
+}
+
+$("playBtn").onclick=play;$("stopBtn").onclick=stop;$("panicBtn").onclick=()=>{if(IS_IOS)panicIOSSlots();if(engine&&engine.panic)engine.panic();};
+$("clearBtn").onclick=()=>{pushHistory();for(const r of pattern)r.fill(0);renderSeq();lcd("PATTERN CLEARED",model.display);};
+$("bpm").oninput=e=>$("bpmv").textContent=e.target.value;$("swing").oninput=e=>$("swingv").textContent=e.target.value;
+let tapTimes=[];if($("tapBtn"))$("tapBtn").onclick=()=>{const now=performance.now();tapTimes=tapTimes.filter(t=>now-t<2400);tapTimes.push(now);if(tapTimes.length>1){const ds=tapTimes.slice(1).map((t,i)=>t-tapTimes[i]);const avg=ds.reduce((a,b)=>a+b,0)/ds.length;const bpm=Math.max(40,Math.min(250,Math.round(60000/avg)));$("bpm").value=bpm;$("bpmv").textContent=bpm;lcd('TAP TEMPO',`${bpm} BPM • ${tapTimes.length} TAPS`);}};
+window.addEventListener('keydown',e=>{if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if(e.code==='Space'){e.preventDefault();playing?stop():play();}else if(e.key==='Escape'){stop();}});
+$("voiceSel").onchange=e=>{pushHistory();padState[selectedPad].voice=+e.target.value;renderPads();syncEditor();};
+$("tune").oninput=e=>{padState[selectedPad].tune=+e.target.value;$("tunev").textContent=e.target.value;};
+$("vol").oninput=e=>{padState[selectedPad].vol=+e.target.value;$("volv").textContent=e.target.value;};
+$("pan").oninput=e=>{padState[selectedPad].pan=+e.target.value;$("panv").textContent=`${e.target.value} / HW ${panCodeFromUI(+e.target.value)}`;};
+$("out1Btn").onclick=()=>{pushHistory();padState[selectedPad].bus=1;syncEditor();};
+$("out2Btn").onclick=()=>{pushHistory();padState[selectedPad].bus=2;syncEditor();};
+
+document.querySelectorAll(".modelBtn").forEach(b=>b.onclick=()=>setModel(b.dataset.model));
+
+if($("hatTestBtn"))$("hatTestBtn").onclick=runHatChokeTest;
+setModel("hr16");setProductMode("authentic",false);
+
+// DEV12 late hooks keep secondary product views synced with the original engine.
+const _dev12RenderPads=renderPads;renderPads=function(){_dev12RenderPads();document.querySelectorAll('.pad').forEach((el,i)=>{if(padState[i]?.mute)el.classList.add('muted');if(padState[i]?.solo)el.classList.add('soloed');});if(document.body.dataset.view==='mixer')renderMixerView();};
+const _dev12SyncEditor=syncEditor;syncEditor=function(){_dev12SyncEditor();if(document.body.dataset.view==='browser')renderVoiceBrowser();};
+const _dev12SetModel=setModel;setModel=function(k){_dev12SetModel(k);if(document.body.dataset.view==='browser')renderVoiceBrowser();if(document.body.dataset.view==='mixer')renderMixerView();};
+
+</script>
+
+<script id="pass20-ui-logic">
+(function(){
+ const $id=id=>document.getElementById(id);
+ function clickId(id){const e=$id(id);if(e)e.click();}
+ function focusId(id){const e=$id(id);if(!e)return;e.focus();e.scrollIntoView({behavior:'smooth',block:'center'});}
+ function showPlay(){if(window.dev12SetView)window.dev12SetView('play');}
+ document.addEventListener('click',e=>{
+   const b=e.target.closest('[data-p20-action]'); if(!b)return; const a=b.dataset.p20Action;
+   if(a==='pattern'||a==='song'){if(window.dev12SetView)window.dev12SetView('patterns');}
+   else if(a==='voice'){if(window.dev12SetView)window.dev12SetView('browser');}
+   else if(a==='mix'){if(window.dev12SetView)window.dev12SetView('mixer');}
+   else if(a==='settings'||a==='midi'){if(window.dev12SetView)window.dev12SetView('settings'); if(a==='midi')setTimeout(()=>focusId('midiChan'),80);}
+   else if(a==='length'){showPlay();setTimeout(()=>focusId('patternLen'),50);}
+   else if(a==='swing'){showPlay();setTimeout(()=>focusId('swing'),50);}
+   else if(a==='tempo'){showPlay();setTimeout(()=>focusId('bpm'),50);}
+   else if(a==='tune'){showPlay();setTimeout(()=>focusId('tune'),50);}
+   else if(a==='step'||a==='quant'||a==='fill'){showPlay();setTimeout(()=>document.querySelector('.seqwrap')?.scrollIntoView({behavior:'smooth',block:'center'}),50);}
+   else if(a==='copy')clickId('copyBarBtn');
+   else if(a==='erase')clickId('clearBarBtn');
+   else if(a==='play')clickId('playBtn');
+   else if(a==='plus'||a==='minus'){const x=$id('bpm');if(x){x.value=Math.max(+x.min||20,Math.min(+x.max||300,+x.value+(a==='plus'?1:-1)));x.dispatchEvent(new Event('input',{bubbles:true}));}}
+ });
+ // Replace the utilitarian mixer renderer with a hardware-console renderer while preserving the same state/actions.
+ window.renderMixerView=function(){
+   const g=$id('mixerGrid');if(!g||!padState)return;g.innerHTML='';
+   padState.forEach((p,i)=>{const v=model.voices[p.voice]||model.voices[0];const panRot=(p.pan||0)*15;const d=document.createElement('div');d.className='mixStrip';
+     d.innerHTML=`<h4>${String(i+1).padStart(2,'0')} · ${p.label}<br><span class="mini">${v.name}</span></h4><div class="p20Meter"></div><div class="p20PanKnob" style="--knob-rot:${panRot}deg"></div><div class="p20PanLabel">PAN ${p.pan>0?'R'+p.pan:p.pan<0?'L'+Math.abs(p.pan):'C'}</div><div class="p20FaderWell"><input data-mix="vol" data-i="${i}" type="range" min="0" max="127" value="${p.vol}" aria-label="${p.label} level"></div><div class="p20MixButtons"><button data-mix="mute" data-i="${i}">${p.mute?'UNMUTE':'MUTE'}</button><button data-mix="solo" data-i="${i}">${p.solo?'UNSOLO':'SOLO'}</button></div><input data-mix="pan" data-i="${i}" type="range" min="-3" max="3" value="${p.pan}" aria-label="${p.label} pan" style="margin-top:8px;width:100%">`;g.appendChild(d);});
+   g.querySelectorAll('[data-mix="vol"]').forEach(e=>e.oninput=()=>{const i=+e.dataset.i;padState[i].vol=+e.value;if(i===selectedPad){$id('vol').value=e.value;$id('volv').textContent=e.value;}renderPads();});
+   g.querySelectorAll('[data-mix="pan"]').forEach(e=>e.oninput=()=>{const i=+e.dataset.i;padState[i].pan=+e.value;const strip=e.closest('.mixStrip'),k=strip?.querySelector('.p20PanKnob'),l=strip?.querySelector('.p20PanLabel');if(k)k.style.setProperty('--knob-rot',(+e.value)*15+'deg');if(l)l.textContent='PAN '+(+e.value>0?'R'+e.value:+e.value<0?'L'+Math.abs(+e.value):'C');if(i===selectedPad){$id('pan').value=e.value;$id('panv').textContent=e.value;}});
+   g.querySelectorAll('[data-mix="mute"]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;padState[i].mute=!padState[i].mute;renderMixerView();renderPads();});
+   g.querySelectorAll('[data-mix="solo"]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;padState[i].solo=!padState[i].solo;renderMixerView();renderPads();});
+ };
+})();
+</script>
+
+</main></div><div class="appStatusbar"><span><i class="statusLed on"></i><b id="appEngineText">Audio Ready</b></span><span id="appModelText">HR-16</span><span>3 machines • sounds built in</span><span class="grow"></span><span>MIDI: <b id="appMidiText">OFF</b></span><span class="ready">● Ready</span></div></div>
+<script id="pass23-shell-script">
+window.addEventListener('DOMContentLoaded',()=>{
+ const nav=document.querySelector('.productNav');const side=document.getElementById('appSidebar');if(nav&&side)side.appendChild(nav);
+ const sync=()=>{
+  const mt=document.getElementById('modelTitle')?.textContent||'HR-16';
+  const ms=document.getElementById('modelSub')?.textContent||'';
+  const eng=document.getElementById('engineStat')?.textContent||'READY';
+  const midi=document.getElementById('midiStat')?.textContent||'OFF';
+  const chip=document.getElementById('appModelChip');if(chip)chip.innerHTML=`${mt} <b>${mt==='SR-16'?'12 PAD':'16 PAD'}</b>`;
+  const a=document.getElementById('appModelText');if(a)a.textContent=mt;const e=document.getElementById('appEngineText');if(e)e.textContent=/FAILED|ERROR/.test(eng)?'Audio Error':(/ACTIVE|LIVE|IOS/.test(eng)?'Audio Active':'Audio Ready');const m=document.getElementById('appMidiText');if(m)m.textContent=midi.replace(/^MIDI\s*/,'')||'OFF';
+ };
+ sync();setInterval(sync,600);
+});
+</script>
+
+<script id="pass24-web-mobile-script">
+(()=>{
+ const ROM_EXPECTED={hr16:{bytes:1048576,crc32:0xbd375386},hr16b:{bytes:1048576,crc32:0xf5e8f90d},sr16:{bytes:1048576,crc32:0xf37f8486}};
+ const CRC_TABLE=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);t[n]=c>>>0;}return t;})();function crc32(bytes){let c=0xffffffff;for(let i=0;i<bytes.length;i++)c=(c>>>8)^CRC_TABLE[(c^bytes[i])&255];return (c^0xffffffff)>>>0;}
+ function verifyEmbeddedRoms(){
+  try{
+   const keys=['hr16','hr16b','sr16'];let ok=0;
+   for(const k of keys){const b=b64bytes(ROM_B64[k]||'');const exp=ROM_EXPECTED[k];if(b.length===exp.bytes && crc32(b)===exp.crc32)ok++;}
+   const t=document.getElementById('appRomText');if(t)t.textContent=ok===3?'BUILT IN':`${ok}/3 READY`;
+   document.documentElement.dataset.romBundle=ok===3?'ok':'bad';
+   return ok===3;
+  }catch(e){const t=document.getElementById('appRomText');if(t)t.textContent='CHECK';return false;}
+ }
+ function syncPatternLength(value,source){
+  const v=Math.max(16,Math.min(64,parseInt(value,10)||32));
+  patternLength=v;
+  const a=document.getElementById('patternLen'),b=document.getElementById('appPatternLen');
+  if(a&&a!==source)a.value=String(v);if(b&&b!==source)b.value=String(v);
+  if(typeof renderSeq==='function')renderSeq();
+  try{localStorage.setItem('dm3ag.patternLength',String(v));}catch(_){}
+ }
+ function setViewportUnit(){document.documentElement.style.setProperty('--app-vh',`${(window.visualViewport?.height||window.innerHeight)*0.01}px`);}
+ window.addEventListener('DOMContentLoaded',()=>{
+  const a=document.getElementById('patternLen'),b=document.getElementById('appPatternLen');
+  let saved=null;try{saved=localStorage.getItem('dm3ag.patternLength');}catch(_){}
+  const start=['16','32','48','64'].includes(saved)?saved:(a?.value||'32');
+  if(a){a.value=start;a.addEventListener('change',e=>syncPatternLength(e.target.value,e.target));}
+  if(b){b.value=start;b.addEventListener('change',e=>syncPatternLength(e.target.value,e.target));}
+  syncPatternLength(start,null);
+  verifyEmbeddedRoms();setViewportUnit();
+  window.addEventListener('resize',setViewportUnit,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(()=>{setViewportUnit();if(typeof renderSeq==='function')renderSeq();},120),{passive:true});
+  if(window.visualViewport)window.visualViewport.addEventListener('resize',setViewportUnit,{passive:true});
+ },{once:true});
+})();
+</script>
+
+<div class="helpOverlay" id="p25Help" role="dialog" aria-modal="true" aria-labelledby="p25HelpTitle">
+ <div class="helpDialog">
+  <div class="helpHead"><div><h2 id="p25HelpTitle">DM3AG Rhythm Lab Help</h2><small>Quick Start, controls and shortcuts</small></div><button class="helpClose" id="p25HelpClose" aria-label="Close help">×</button></div>
+  <div class="helpBody">
+   <div class="helpHero">
+    <section class="helpCard"><h3>QUICK START</h3><div class="helpSteps">
+     <div class="helpStep"><span>Choose HR-16, HR-16B or SR-16.</span></div>
+     <div class="helpStep"><span>Tap a pad once to enable audio, then audition sounds.</span></div>
+     <div class="helpStep"><span>Click steps in the grid to build a pattern. Set Length to 16, 32, 48 or 64.</span></div>
+     <div class="helpStep"><span>Set tempo/swing and press Play. Save Kit stores your current setup.</span></div>
+    </div></section>
+    <section class="helpCard"><h3>PAD & STEP EDITING</h3>
+     <p><b>Pad:</b> click/tap to select and play. Right-click mutes. Shift + right-click solos.</p>
+     <p><b>Step:</b> click/tap toggles. Alt/Option-click adds 50% probability. Shift-click adds a ratchet.</p>
+     <p><b>Selected pad:</b> use Voice, Tune, Level and Pan below the pads.</p>
+    </section>
+   </div>
+   <section class="helpCard"><h3>KEYBOARD SHORTCUTS</h3><div class="shortcutGrid">
+    <kbd>Space</kbd><span>Play / Stop</span>
+    <kbd>1–0, Q–Y</kbd><span>Trigger performance pads</span>
+    <kbd>Shift + pad key</kbd><span>Trigger at maximum velocity</span>
+    <kbd>Ctrl/Cmd + S</kbd><span>Save kit</span>
+    <kbd>Ctrl/Cmd + Z</kbd><span>Undo</span>
+    <kbd>Shift + Ctrl/Cmd + Z</kbd><span>Redo</span>
+    <kbd>F1 or ?</kbd><span>Open Help</span>
+    <kbd>Esc</kbd><span>Close Help / stop playback</span>
+   </div></section>
+   <section class="helpCard"><h3>MOBILE & BROWSER</h3><p>Portrait and landscape are supported. The step grid scrolls horizontally on smaller screens. On iPhone/iPad, tap a pad or Play once to authorize browser audio.</p></section>
+   <section class="helpCard"><h3>ABOUT</h3><p>HR-16, HR-16B and SR-16 sound data are embedded in this single HTML file, so no separate sound download is required. The normal interface hides engineering diagnostics; they remain available under Settings → Technical Info.</p><div class="helpActions"><button id="p25GoSettings">OPEN SETTINGS</button><button id="p25ToggleTech">SHOW TECHNICAL INFO</button></div><p class="helpFine">Technical info is intended for troubleshooting and verification, not routine pattern creation.</p></section>
+  </div>
+ </div>
+</div>
+<div class="p25Toast" id="p25Toast" role="status" aria-live="polite"></div>
+
+<script id="pass25-presentation-script">
+(()=>{
+ const help=()=>document.getElementById('p25Help');
+ function openHelp(){const h=help();if(!h)return;h.classList.add('open');document.body.classList.add('p25HelpOpen');setTimeout(()=>document.getElementById('p25HelpClose')?.focus(),0);}
+ function closeHelp(){const h=help();if(!h)return;h.classList.remove('open');document.body.classList.remove('p25HelpOpen');}
+ function toast(msg){const t=document.getElementById('p25Toast');if(!t)return;t.textContent=msg;t.classList.add('show');clearTimeout(window.__p25ToastTimer);window.__p25ToastTimer=setTimeout(()=>t.classList.remove('show'),1800);}
+ function syncFriendlyLabels(){
+  const auth=document.getElementById('authBtn'),modern=document.getElementById('modernBtn');if(auth)auth.textContent='CLASSIC';if(modern)modern.textContent='ENHANCED';
+  const sa=document.getElementById('settingsAuth'),sm=document.getElementById('settingsModern');if(sa)sa.textContent='CLASSIC MODE';if(sm)sm.textContent='ENHANCED MODE';
+  const adv=document.getElementById('advancedBtn');if(adv)adv.textContent=document.body.classList.contains('simpleUI')?'MORE':'LESS';
+ }
+ window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('helpMenuBtn')?.addEventListener('click',openHelp);
+  document.getElementById('helpToolBtn')?.addEventListener('click',openHelp);
+  document.getElementById('settingsHelp')?.addEventListener('click',openHelp);
+  document.getElementById('p25HelpClose')?.addEventListener('click',closeHelp);
+  help()?.addEventListener('click',e=>{if(e.target===help())closeHelp();});
+  document.getElementById('p25GoSettings')?.addEventListener('click',()=>{closeHelp();document.querySelector('.viewBtn[data-view="settings"]')?.click();});
+  document.getElementById('p25ToggleTech')?.addEventListener('click',()=>{document.getElementById('advancedBtn')?.click();syncFriendlyLabels();toast(document.body.classList.contains('simpleUI')?'Technical info hidden':'Technical info shown');});
+  document.getElementById('settingsAdvanced')?.addEventListener('click',()=>setTimeout(syncFriendlyLabels,0));
+  syncFriendlyLabels();
+  // Normal UI should start clean on every load; diagnostics are opt-in.
+  document.body.classList.add('simpleUI');
+ },{once:true});
+ window.addEventListener('keydown',e=>{
+  if(help()?.classList.contains('open') && e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeHelp();return;}
+  if(e.key==='F1' || (e.key==='?' && !e.ctrlKey && !e.metaKey && !(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)))){e.preventDefault();openHelp();}
+ },true);
+ window.DM3AGHelp={open:openHelp,close:closeHelp};
+})();
+</script>
+
+<script id="pass26-final-polish-js">
+(()=>{
+ let voiceCategory='all';
+ const cat=v=>{const n=(v?.name||'').toLowerCase();if(n.includes('kick')||n.includes('bass drum'))return'kick';if(n.includes('snare')||n.includes('rim')||n.includes('stick'))return'snare';if(n.includes('tom'))return'tom';if(n.includes('hat'))return'hat';if(n.includes('cymbal')||n.includes('ride')||n.includes('crash'))return'cymbal';return'perc';};
+ const panText=v=>v===0?'C':v<0?`L${Math.abs(v)}`:`R${v}`;
+ window.renderMixerView=function(){
+  const g=document.getElementById('mixerGrid');if(!g||typeof padState==='undefined'||typeof model==='undefined'||!model)return;g.innerHTML='';
+  const mm=document.getElementById('p26MixModel');if(mm)mm.textContent=model.display;
+  padState.forEach((p,i)=>{const v=model.voices[p.voice]||model.voices[0],d=document.createElement('div');d.className='mixStrip'+(i===selectedPad?' selected':'');
+   d.innerHTML=`<h4><b>${String(i+1).padStart(2,'0')} · ${p.label}</b><span>${v.name}</span></h4><div class="p26MeterRail"><i style="--level:${Math.round((p.vol||0)/127*100)}%"></i></div><label>LEVEL <input data-mix="vol" data-i="${i}" type="range" min="0" max="127" value="${p.vol}"><output>${p.vol}</output></label><label>PAN <input data-mix="pan" data-i="${i}" type="range" min="-3" max="3" value="${p.pan}"><output>${panText(p.pan)}</output></label><div class="p26Route"><span>OUT</span><select data-mix="bus" data-i="${i}"><option value="1" ${p.bus!==2?'selected':''}>OUT 1</option><option value="2" ${p.bus===2?'selected':''}>OUT 2</option></select></div><div class="p26MixButtons"><button data-mix="mute" data-i="${i}" class="${p.mute?'on':''}">${p.mute?'MUTED':'MUTE'}</button><button data-mix="solo" data-i="${i}" class="${p.solo?'on':''}">${p.solo?'SOLOED':'SOLO'}</button></div>`;g.appendChild(d);});
+  g.querySelectorAll('[data-mix="vol"]').forEach(e=>e.oninput=()=>{const i=+e.dataset.i;padState[i].vol=+e.value;e.parentElement.querySelector('output').textContent=e.value;if(i===selectedPad){document.getElementById('vol').value=e.value;document.getElementById('volv').textContent=e.value;}renderPads();});
+  g.querySelectorAll('[data-mix="pan"]').forEach(e=>e.oninput=()=>{const i=+e.dataset.i;padState[i].pan=+e.value;e.parentElement.querySelector('output').textContent=panText(+e.value);if(i===selectedPad){document.getElementById('pan').value=e.value;document.getElementById('panv').textContent=e.value;}renderPads();});
+  g.querySelectorAll('[data-mix="bus"]').forEach(e=>e.onchange=()=>{padState[+e.dataset.i].bus=+e.value;if(+e.dataset.i===selectedPad)syncEditor?.();renderPads();});
+  g.querySelectorAll('[data-mix="mute"]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;padState[i].mute=!padState[i].mute;renderPads();renderMixerView();});
+  g.querySelectorAll('[data-mix="solo"]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;padState[i].solo=!padState[i].solo;renderPads();renderMixerView();});
+ };
+ window.renderVoiceBrowser=function(){
+  const list=document.getElementById('voiceList');if(!list||typeof model==='undefined'||!model)return;const q=(document.getElementById('voiceSearch')?.value||'').trim().toLowerCase();list.innerHTML='';
+  const bp=document.getElementById('browserPad');if(bp)bp.textContent=padState[selectedPad]?.label||'—';const bm=document.getElementById('browserModel');if(bm)bm.textContent=model.display;
+  const current=model.voices[padState[selectedPad]?.voice]||null;const cv=document.getElementById('p26CurrentVoice');if(cv)cv.textContent=current?.name||'Choose a sound';
+  let shown=0;model.voices.forEach((v,i)=>{const type=cat(v),hay=`${v.num} ${v.name} ${type}`.toLowerCase();if(q&&!hay.includes(q))return;if(voiceCategory!=='all'&&type!==voiceCategory)return;shown++;const d=document.createElement('div');d.className='voiceItem'+(padState[selectedPad]?.voice===i?' selected':'');d.innerHTML=`<span class="voiceNum">${String(v.num).padStart(3,'0')}</span><b>${v.name}</b><span class="voiceType">${type}</span>`;d.onclick=()=>{pushHistory?.();padState[selectedPad].voice=i;fillVoiceSelect();syncEditor();renderPads();renderVoiceBrowser();triggerPad(selectedPad,105);};list.appendChild(d);});
+  const total=document.getElementById('p26VoiceCount'),side=document.getElementById('p26SidebarCount');if(total)total.textContent=`${shown} VOICES`;if(side)side.textContent=`${shown} / ${model.voices.length}`;
+ };
+ window.renderHistoryPatterns=function(){const g=document.getElementById('historyPatternGrid');if(!g)return;g.innerHTML='';const visible=HISTORY_PATTERNS.filter(p=>historyPatternFilter==='all'||p.genre===historyPatternFilter||(historyPatternFilter==='alesis'&&p.alesis));for(const p of visible){const ok=historyPatternValid(p),d=document.createElement('article');d.className='patternCard';d.innerHTML=`<div class="patternArtist">${p.artist}</div><h3>${p.title}</h3><div class="mini">${p.section}</div><div class="patternMeta"><span class="patternBadge verified">${ok?'READY':'UNAVAILABLE'}</span><span class="patternBadge ${p.genre}">${p.genre.toUpperCase()}</span>${p.alesis?'<span class="patternBadge alesis">ALESIS</span>':''}<span class="patternBadge">${p.bpm} BPM</span><span class="patternBadge">${p.length} STEPS</span></div>${historyPreview(p)}<div class="patternActions"><button data-loadhist="${p.id}" ${ok?'':'disabled'}>LOAD</button><button data-playhist="${p.id}" ${ok?'':'disabled'}>LOAD + PLAY</button></div><div class="patternSource">Transcription reference · ${p.sources.map((u,i)=>`<a href="${u}" target="_blank" rel="noopener">${i+1}</a>`).join(' · ')}</div>`;g.appendChild(d);}g.querySelectorAll('[data-loadhist]').forEach(b=>b.onclick=()=>loadHistoryPattern(b.dataset.loadhist,false));g.querySelectorAll('[data-playhist]').forEach(b=>b.onclick=()=>loadHistoryPattern(b.dataset.playhist,true));const q=document.getElementById('historyResearchQueue');if(q)q.innerHTML=HISTORY_RESEARCH_QUEUE.map(x=>`<div class="queueItem"><span><b>${x[0]} — ${x[1]}</b><br>${x[2]}</span><span class="queueState">NOT YET AVAILABLE</span></div>`).join('');};
+ function syncSettings(){const f=document.getElementById('analogModel'),pf=document.getElementById('p26AnalogModel');if(f&&pf)pf.checked=f.checked;const vc=document.getElementById('velCurve'),pvc=document.getElementById('p26VelCurve');if(vc&&pvc)pvc.value=vc.value;const pl=document.getElementById('patternLen'),ppl=document.getElementById('p26PatternLen');if(pl&&ppl)ppl.value=pl.value;}
+ function closeMenu(){document.getElementById('p26MenuPopup')?.remove();}
+ function openMenu(btn,items){closeMenu();const r=btn.getBoundingClientRect(),p=document.createElement('div');p.id='p26MenuPopup';p.className='appMenuPopup';for(const it of items){if(it.sep){const s=document.createElement('div');s.className='sep';p.appendChild(s);continue;}const b=document.createElement('button');b.textContent=it.label;b.onclick=()=>{closeMenu();it.action();};p.appendChild(b);}document.body.appendChild(p);p.style.left=Math.min(r.left,innerWidth-p.offsetWidth-8)+'px';p.style.top=(r.bottom+2)+'px';}
+ window.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.voiceFilter').forEach(b=>b.addEventListener('click',()=>{voiceCategory=b.dataset.vcat||'all';document.querySelectorAll('.voiceFilter').forEach(x=>x.classList.toggle('active',x===b));renderVoiceBrowser();}));
+  document.getElementById('p26ResetMix')?.addEventListener('click',()=>{pushHistory?.();padState.forEach(p=>{p.vol=112;p.pan=0;p.bus=1;p.mute=false;p.solo=false;});renderPads();renderMixerView();syncEditor?.();});
+  document.getElementById('p26MuteAll')?.addEventListener('click',()=>{const all=padState.every(p=>p.mute);padState.forEach(p=>p.mute=!all);renderPads();renderMixerView();});
+  document.getElementById('p26AnalogModel')?.addEventListener('change',e=>{const x=document.getElementById('analogModel');if(x)x.checked=e.target.checked;});
+  document.getElementById('p26VelCurve')?.addEventListener('change',e=>{const x=document.getElementById('velCurve');if(x){x.value=e.target.value;x.dispatchEvent(new Event('change',{bubbles:true}));}});
+  document.getElementById('p26PatternLen')?.addEventListener('change',e=>{const x=document.getElementById('patternLen');if(x){x.value=e.target.value;x.dispatchEvent(new Event('change',{bubbles:true}));}});
+  const oldSet=window.dev12SetView;window.dev12SetView=function(v){oldSet(v);if(v==='settings')syncSettings();if(v==='browser')renderVoiceBrowser();if(v==='mixer')renderMixerView();};
+  syncSettings();
+  const menuDefs={File:[{label:'Save Kit',action:()=>document.getElementById('saveKitBtn')?.click()},{label:'Load Kit…',action:()=>document.getElementById('loadKitBtn')?.click()}],Edit:[{label:'Undo',action:()=>document.getElementById('undoBtn')?.click()},{label:'Redo',action:()=>document.getElementById('redoBtn')?.click()},{sep:true},{label:'Clear Current Bar',action:()=>document.getElementById('clearBarBtn')?.click()}],View:[{label:'Machine',action:()=>dev12SetView('play')},{label:'Mixer',action:()=>dev12SetView('mixer')},{label:'Voices',action:()=>dev12SetView('browser')},{label:'Patterns',action:()=>dev12SetView('patterns')},{label:'Settings',action:()=>dev12SetView('settings')}],Tools:[{label:'Enable MIDI',action:()=>document.getElementById('midiBtn')?.click()},{label:'Technical Info',action:()=>document.getElementById('advancedBtn')?.click()}]};
+  document.querySelectorAll('.appMenubar .menuBtn').forEach(btn=>{const key=btn.textContent.trim();if(menuDefs[key])btn.addEventListener('click',e=>{e.stopPropagation();openMenu(btn,menuDefs[key]);});});
+  document.addEventListener('click',closeMenu);window.addEventListener('resize',closeMenu);
+ });
+})();
+</script>
+</body>
+</html>
