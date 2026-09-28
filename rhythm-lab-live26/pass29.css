@@ -1,1 +1,9 @@
-#patternLen,#appPatternLen,#p26PatternLen{pointer-events:auto!important;opacity:1!important}.seqBeatRuler{min-width:0!important}.seqBeatRuler .beatGroup.barStart{border-left:5px solid #d1e0e8!important}.seq .hdr.barStart,.step.barStart{border-left:5px solid #c7d7df!important}.seq .hdr.barStart{box-shadow:inset 4px 0 #8399a6,inset 0 2px #c5d8e2!important}@media(max-width:900px){.seqBeatRuler{min-width:max-content!important}}
+
+/* PASS29: 16/32-step sequencer and two-bar musical grouping */
+#patternLen,#appPatternLen,#p26PatternLen{pointer-events:auto!important;opacity:1!important}
+.seqBeatRuler{min-width:0!important}
+.seqBeatRuler .barSpacer{background:#11171c;border-right:2px solid #72828d}
+.seqBeatRuler .beatGroup.barStart{border-left:5px solid #d1e0e8!important}
+.seq .hdr.barStart,.step.barStart{border-left:5px solid #c7d7df!important}
+.seq .hdr.barStart{box-shadow:inset 4px 0 #8399a6,inset 0 2px #c5d8e2!important}
+@media(max-width:900px){.seqBeatRuler{min-width:max-content!important}}
