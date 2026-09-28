@@ -336,10 +336,25 @@ body.simpleUI .brandblock{padding-left:30px!important}
 @media(max-width:760px){.productView{padding:12px 10px 18px!important}.p26Head{align-items:flex-start!important}.p26HeadActions{display:none}.p26MixerBar,.p26PatternsIntro{align-items:flex-start!important;flex-direction:column!important}.p26MixerActions{width:100%}.p26MixerActions button{flex:1}.mixerGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.p26BrowserLayout{grid-template-columns:1fr!important}.p26BrowserSidebar{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}.p26SelectedTitle,.p26BrowserSidebar>strong,.p26BrowserSidebar>span,.p26Tip{grid-column:1/-1}.voiceList{min-height:300px!important;max-height:none!important}.p26SettingsGrid{grid-template-columns:1fr!important}.patternGrid{grid-template-columns:1fr!important}}
 @media(max-width:460px){.mixerGrid{grid-template-columns:1fr!important}.voiceFilters{display:grid;grid-template-columns:repeat(4,1fr);width:100%}.voiceFilter{padding:0 4px!important}.p26ListHeader,.voiceItem{grid-template-columns:36px minmax(0,1fr) 65px!important}.patternGridPreview{grid-template-columns:42px repeat(16,15px)!important;overflow-x:auto}.p26Head h2{font-size:22px!important}}
 </style>
-</head>
-<body data-model="hr16">
-<div class="desktopApp">
- <div class="appTitlebar"><div class="appIcon"></div><div class="appTitle">DM3AG Rhythm Lab <small>Drum Machine Studio</small></div><div class="appTitleSpacer"></div><div class="appSession">Untitled Kit • 120 BPM</div><div class="winBtns"><button class="winBtn" tabindex="-1">—</button><button class="winBtn" tabindex="-1">□</button><button class="winBtn close" tabindex="-1">×</button></div></div>
- <div class="appMenubar"><button class="menuBtn">File</button><button class="menuBtn">Edit</button><button class="menuBtn">View</button><button class="menuBtn">Tools</button><button class="menuBtn" id="helpMenuBtn">Help</button><div class="menuRight"><span><i class="statusLed on"></i>AUDIO</span><span>READY</span></div></div>
- <div class="appToolbar">
-  <button class="toolBtn load" title="Load kit" onclick="document.getElementById('loadKitBtn')?.click()"></button><button class="toolBtn save" title="Save kit" onclick="document.getElementById('saveKitBtn')?.click()"></button><span class="toolSep"></span><button class="toolBtn undo" title="Undo" onclick="document.getElementById('undoBtn')?.click()"></button><button class="toolBtn redo" title="Redo" onclick="document.getElementById('redoBtn')?.click()"></button><span class="toolSep"></span><button class="toolBtn play" title="Play" onclick="document.getElementById('playBtn')?.click()"></button><button class="toolBtn stop" title="Stop" onclick="document.getElementById('stopBtn')?.click()"></button><span class="toolSep"></span><button class="toolBtn midi" title="MIDI" onclick="document.getElementById('midiBtn')?.click()"></button><button class="toolBtn settin
+
+<style id="pass27-ios-mobile-fix">
+html,body{width:100%;max-width:100%;overflow-x:hidden!important;-webkit-text-size-adjust:100%;overscroll-behavior-x:none}
+.desktopApp,.appMain,.appContent,.machine,.panel,.productView{box-sizing:border-box;max-width:100%!important;min-width:0!important}
+.panel>*{min-width:0!important;max-width:100%!important}
+.seqwrap{box-sizing:border-box;width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch!important;contain:inline-size}
+.seq{width:max-content!important;max-width:none!important;min-width:max-content!important}
+.seq .hdr,.seq .lab,.step{box-sizing:border-box}
+.pad,.toolBtn,.viewBtn,.modelBtn,.transport button,.primaryTools button{touch-action:manipulation}
+.step{touch-action:none}
+@media(max-width:900px){
+ .appContent{overflow-x:hidden!important}
+ body.simpleUI .p20HardwareKeys,body.simpleUI .p20Faders,body.simpleUI .p20DataWheel{display:none!important}
+ body.simpleUI .panel{grid-auto-flow:row!important;grid-auto-columns:minmax(0,1fr)!important}
+ body.simpleUI .panel:before{display:none!important}
+ .seqwrap:before{content:"STEP SEQUENCER • SWIPE SIDEWAYS FOR MORE STEPS"!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;right:10px}
+ .seq .hdr,.step{width:34px!important;min-width:34px!important;max-width:34px!important}
+ .seq .lab,.seq .padHdr{width:76px!important;min-width:76px!important;max-width:76px!important;position:sticky;left:0;z-index:4;background:#11171a!important}
+ .seq .padHdr{z-index:6!important}
+}
+@media(max-width:760px) and (orientation:portrait){
+ body{p
