@@ -1,0 +1,21 @@
+/* PASS33 — explicit layout rescue after clean materials */
+.modelBtns{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;align-items:stretch!important}
+.modelBtn,.productNav button,.transport button,.qolbar button,.routeBtn,.utilityBtn,.viewBtn,.modeToggle{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;line-height:1.08!important;padding:12px 10px!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+.transport{display:grid!important;gap:10px!important;align-items:stretch!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.transport label{min-width:0!important}.transport label b{display:inline-block;min-width:2.5ch;text-align:right}.transport #hatTestBtn{grid-column:span 2!important}
+.primaryTools{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important;align-items:stretch!important}
+.primaryTools>b,.primaryTools .p25HelpHint,.primaryTools .mini{grid-column:1/-1!important}
+.lcd{margin-bottom:8px!important}
+body[data-p30-layout="tablet"] .transport{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+body[data-p30-layout="tablet"] .transport #hatTestBtn{grid-column:1/-1!important}
+body[data-p30-layout="tablet"] .transport label{grid-column:span 3!important}
+body[data-p30-layout="tablet"] .primaryTools{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+body[data-p30-layout="phone"] .panel{gap:10px!important}
+body[data-p30-layout="phone"] .modelBtns{grid-template-columns:1fr!important;gap:10px!important}
+body[data-p30-layout="phone"] .transport{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+body[data-p30-layout="phone"] .transport #hatTestBtn{grid-column:1/-1!important}
+body[data-p30-layout="phone"] .transport label{grid-column:1/-1!important}
+body[data-p30-layout="phone"] .primaryTools{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+body[data-p30-layout="phone"] .primaryTools>b,body[data-p30-layout="phone"] .primaryTools .p25HelpHint,body[data-p30-layout="phone"] .primaryTools .mini{grid-column:1/-1!important}
+body[data-p30-layout="phone"] .modelBtn,body[data-p30-layout="phone"] .transport button,body[data-p30-layout="phone"] .primaryTools button{min-height:62px!important;font-size:16px!important}
+body[data-p30-layout="phone"] .transport label,body[data-p30-layout="tablet"] .transport label{display:grid!important;grid-template-columns:56px minmax(0,1fr) 40px!important;align-items:center!important;gap:8px!important;padding:8px 10px!important;background:linear-gradient(180deg,rgba(18,20,24,.88),rgba(9,11,14,.92))!important;border:1px solid #474d54!important;border-radius:12px!important;box-shadow:inset 0 1px #6b7177,0 2px 8px #0004!important;color:#d8dde2!important}
