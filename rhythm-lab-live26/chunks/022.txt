@@ -1,4 +1,40 @@
-IDI;$('midiStat').textContent=`MIDI ON • ${midiAccess.inputs.size} INPUT(S)`;};}catch(e){$('midiStat').textContent='MIDI DENIED';}}
+:1}){e.classList.toggle("on",v===1);e.classList.toggle("accent",v===2);e.classList.toggle("prob",m.prob<1);e.classList.toggle("ratchet",m.ratchet>1);e.setAttribute('aria-label',`Step ${+e.dataset.s+1}, ${v===2?'accent':v===1?'on':'off'}, probability ${Math.round(m.prob*100)}%, ratchet x${m.ratchet}`);e.title=`velocity ${v===2?127:v===1?92:0} • probability ${Math.round(m.prob*100)}% • ratchet x${m.ratchet}`;}
+function showPlayhead(st){document.querySelectorAll(".step,.seq .hdr[data-s]").forEach(e=>e.classList.toggle('playhead',+e.dataset.s===st));}
+
+function scheduleTick(){
+ if(!playing||!ctx)return;
+ const bpm=+$("bpm").value,sw=+$("swing").value/100,base=(60/bpm)/4,st=stepIndex;
+ const dur=base*((st&1)?sw*2:(1-sw)*2),wait=Math.max(0,(nextStepTime-ctx.currentTime)*1000);
+ setTimeout(()=>{if(!playing)return;showPlayhead(st);for(let p=0;p<padState.length;p++){const v=pattern[p][st],m=metaAt(p,st);if(v&&Math.random()<=m.prob){const vel=v===2?127:92;triggerPad(p,vel);if(m.ratchet>1)setTimeout(()=>triggerPad(p,Math.max(1,vel-8)),Math.max(10,dur*500));}}},wait);
+ nextStepTime+=dur;stepIndex=(stepIndex+1)%patternLength;
+ seqTimer=setTimeout(scheduleTick,Math.max(5,(nextStepTime-ctx.currentTime-.04)*1000));
+}
+async function play(){if(await startAudio()){playing=true;stepIndex=0;nextStepTime=ctx.currentTime+.04;clearTimeout(seqTimer);scheduleTick();}}
+function stop(){playing=false;clearTimeout(seqTimer);document.querySelectorAll(".step,.seq .hdr[data-s]").forEach(e=>e.classList.remove("playhead"));if(IS_IOS)panicIOSSlots();if(engine&&engine.panic)engine.panic();}
+
+
+function recordSRTrace(i,v,comps,velocity,panCode,slot,bus){
+ const row={t:performance.now(),pad:padState[i]?.label||i,voice:v?.name||'',voiceNum:v?.num,velocity,panCode,slot,bus,components:comps.map(c=>({ptr:c.ptr,selector:c.selector,b1:c.b1,b4:c.b4,b5:c.b5,b6:c.b6,b7:c.b7,pitchRatio:srPitchRatio(c),role:c.role||srDescriptorRole(c)}))};
+ srTraceLog.push(row); if(srTraceLog.length>256)srTraceLog.shift(); const stat=$('traceStat');if(stat)stat.textContent=`TRACE ${srTraceLog.length} • LAST ${row.pad} V${velocity}`;
+}
+function copyBar(){const base=Math.floor(stepIndex/16)*16;barClipboard={pattern:pattern.map(r=>r.slice(base,base+16)),meta:stepMeta.map(r=>r.slice(base,base+16).map(x=>({...x})))};lcd('BAR COPIED',`${base+1}-${base+16}`);}
+function pasteBar(){if(!barClipboard)return;pushHistory();const base=Math.floor(stepIndex/16)*16;for(let p=0;p<padState.length;p++)for(let j=0;j<16&&base+j<64;j++){pattern[p][base+j]=barClipboard.pattern[p]?.[j]||0;stepMeta[p][base+j]={...(barClipboard.meta[p]?.[j]||{prob:1,ratchet:1})};}renderSeq();lcd('BAR PASTED',`${base+1}-${base+16}`);}
+function duplicateBar(){copyBar();const base=Math.floor(stepIndex/16)*16,dst=base+16;if(dst>=patternLength&&patternLength<64){patternLength=Math.min(64,patternLength+16);$('patternLen').value=String(patternLength);}pushHistory();for(let p=0;p<padState.length;p++)for(let j=0;j<16&&dst+j<64;j++){pattern[p][dst+j]=barClipboard.pattern[p]?.[j]||0;stepMeta[p][dst+j]={...(barClipboard.meta[p]?.[j]||{prob:1,ratchet:1})};}renderSeq();lcd('BAR DUPLICATED',`${dst+1}-${Math.min(dst+16,patternLength)}`);}
+function clearBar(){pushHistory();const base=Math.floor(stepIndex/16)*16;for(let p=0;p<padState.length;p++)for(let j=0;j<16&&base+j<64;j++){pattern[p][base+j]=0;stepMeta[p][base+j]={prob:1,ratchet:1};}renderSeq();lcd('BAR CLEARED',`${base+1}-${base+16}`);}
+function runRegression(){
+ const results=[];const pass=(name,ok)=>results.push([name,!!ok]);
+ pass('pitch 00 = .5x',Math.abs(((0+16)/32)-.5)<1e-9);pass('pitch 10 = 1x',Math.abs(((16+16)/32)-1)<1e-9);pass('pitch 1F = 47/32',Math.abs(((31+16)/32)-(47/32))<1e-9);
+ pass('hat slot = 2',(()=>{const i=findPadByLabelContains('HAT');return i<0||slotForPad(i)===2})());
+ pass('pattern length valid',[16,32,48,64].includes(patternLength));
+ if(modelKey==='sr16'){let total=0,bad=0;for(const v of model.voices)for(const d of (v.descriptors||[])){total++;if((d.b4|0)<0||(d.b4|0)>31)bad++;}pass(`SR b4 domain ${total}`,bad===0);}
+ const ok=results.every(x=>x[1]),txt=results.map(x=>(x[1]?'PASS ':'FAIL ')+x[0]).join(' • ');$('traceStat').textContent=(ok?'REGRESSION PASS':'REGRESSION FAIL');$('hwAudit').textContent=txt;lcd(ok?'REGRESSION PASS':'REGRESSION FAIL',`${results.filter(x=>x[1]).length}/${results.length}`);return results;
+}
+function dumpSRTrace(){if(modelKey!=='sr16'){lcd('TRACE','SELECT SR-16');return;}const text=srTraceLog.slice(-20).map((r,n)=>`${n+1}. ${r.pad} ${r.voice} V${r.velocity} SLOT${r.slot} OUT${r.bus} `+r.components.map(c=>`$${c.ptr.toString(16).toUpperCase()} sel${c.selector} b4=${c.b4} x${c.pitchRatio.toFixed(4)}`).join(' + ')).join('\n');$('hwAudit').textContent=text||'No SR-16 triggers yet.';}
+function setModel(k){
+ stop();modelKey=k;model=MODELS[k];document.body.dataset.model=k;
+ 
+$('authBtn').onclick=()=>{pushHistory();setProductMode('authentic');};$('modernBtn').onclick=()=>{pushHistory();setProductMode('modern');};$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;$('saveKitBtn').onclick=exportKit;$('loadKitBtn').onclick=()=>$('kitFile').click();$('kitFile').onchange=e=>{if(e.target.files[0])importKitFile(e.target.files[0]);e.target.value='';};
+async function enableMIDI(){if(!navigator.requestMIDIAccess){$('midiStat').textContent='MIDI UNSUPPORTED';return;}try{midiAccess=await navigator.requestMIDIAccess();midiEnabled=true;for(const input of midiAccess.inputs.values())input.onmidimessage=onMIDI;$('midiStat').textContent=`MIDI ON • ${midiAccess.inputs.size} INPUT(S)`;$('midiBtn').textContent='MIDI ENABLED';midiAccess.onstatechange=()=>{for(const input of midiAccess.inputs.values())input.onmidimessage=onMIDI;$('midiStat').textContent=`MIDI ON • ${midiAccess.inputs.size} INPUT(S)`;};}catch(e){$('midiStat').textContent='MIDI DENIED';}}
 function onMIDI(ev){if(!midiEnabled)return;const [st,d1,d2]=ev.data,ch=(st&15)+1,type=st&0xF0,want=+$('midiChan').value;if(want&&ch!==want)return;if(type===0x90&&d2>0){let i=d1>=36&&d1<36+padState.length?d1-36:d1%padState.length;if(i>=0&&i<padState.length){selectedPad=i;syncEditor();triggerPad(i,d2);}}}
 $('midiBtn').onclick=enableMIDI;window.addEventListener('keydown',e=>{if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();exportKit();return;}const map='1234567890qwerty',i=map.indexOf(e.key.toLowerCase());if(i>=0&&i<padState.length){selectedPad=i;syncEditor();triggerPad(i,e.shiftKey?127:108);}});
 
@@ -237,6 +273,55 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('.appMenubar .menuBtn').forEach(btn=>{const key=btn.textContent.trim();if(menuDefs[key])btn.addEventListener('click',e=>{e.stopPropagation();openMenu(btn,menuDefs[key]);});});
   document.addEventListener('click',closeMenu);window.addEventListener('resize',closeMenu);
  });
+})();
+</script>
+
+<script id="pass27-ios-audio-unlock">
+(()=>{
+ const gate=()=>document.getElementById('iosAudioGate');
+ const state=()=>document.getElementById('iosAudioGateState');
+ function setAudioUI(ok,msg){
+  const st=state();if(st)st.textContent=msg||(ok?'Audio ready':'Audio not ready');
+  const e=document.getElementById('engineStat');if(e){e.textContent=ok?'ACTIVE':'TAP TO ENABLE';e.className=ok?'good':'';}
+  const at=document.getElementById('appEngineText');if(at)at.textContent=ok?'Audio Active':'Tap to Enable Audio';
+  document.querySelectorAll('.menuRight .statusLed,.appStatusbar .statusLed').forEach(x=>x.classList.toggle('on',!!ok));
+ }
+ function silentKick(c){
+  try{
+   const b=c.createBuffer(1,1,Math.max(22050,c.sampleRate||48000));
+   const src=c.createBufferSource(),g=c.createGain();g.gain.value=0;src.buffer=b;src.connect(g);g.connect(c.destination);src.start(0);
+   src.onended=()=>{try{src.disconnect();g.disconnect()}catch(_){}};
+  }catch(_){}
+ }
+ async function unlock(){
+  const st=state();if(st)st.textContent='Starting audio…';
+  try{
+   const c=typeof ensureIOSContextSync==='function'?ensureIOSContextSync():null;
+   if(!c)throw new Error('Web Audio unavailable');
+   silentKick(c);
+   let p;try{p=c.resume&&c.resume()}catch(_){}
+   if(p&&typeof p.then==='function')await p.catch(()=>{});
+   silentKick(c);
+   const ok=c.state==='running';
+   setAudioUI(ok,ok?'Audio ready — pads are live':('Audio is '+c.state+'; tap again'));
+   if(ok){gate()?.classList.remove('show');try{localStorage.setItem('dm3ag-audio-had-unlocked','1')}catch(_){}}
+   return ok;
+  }catch(e){console.error(e);setAudioUI(false,e&&e.message?e.message:String(e));return false;}
+ }
+ function needsGate(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+ window.DM3AGUnlockAudio=unlock;
+ window.addEventListener('DOMContentLoaded',()=>{
+  const g=gate(),b=document.getElementById('iosAudioStart');
+  if(b){
+   b.addEventListener('pointerdown',()=>{try{if(typeof ensureIOSContextSync==='function'){const c=ensureIOSContextSync();silentKick(c)}}catch(_){}},{passive:true});
+   b.addEventListener('touchend',()=>{try{if(typeof ensureIOSContextSync==='function'){const c=ensureIOSContextSync();silentKick(c)}}catch(_){}},{passive:true});
+   b.addEventListener('click',unlock);
+  }
+  if(needsGate()){g&&g.classList.add('show');setAudioUI(false,'Tap once to enable iOS audio');}
+  else setAudioUI(true,'Audio will start on first pad or Play');
+ });
+ ['pointerdown','touchend'].forEach(ev=>document.addEventListener(ev,()=>{if(typeof ctx!=='undefined'&&ctx&&ctx.state==='suspended'){try{ctx.resume();silentKick(ctx)}catch(_){}}},{capture:true,passive:true}));
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof ctx!=='undefined'&&ctx&&ctx.state==='suspended')setAudioUI(false,'Tap a pad to resume audio');});
 })();
 </script>
 </body>
