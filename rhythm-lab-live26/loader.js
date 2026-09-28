@@ -16,7 +16,7 @@
   const romSection=h.slice(rb,Math.min(h.length,rb+4300000));
   for(const k of ['"hr16":','"hr16b":','"sr16":']) if(!romSection.includes(k)) throw new Error('embedded ROM missing: '+k.replace(/[":]/g,''));
   if(!h.includes('bytes:1048576')||!h.includes('verifyEmbeddedRoms')) throw new Error('ROM integrity verifier missing');
-  h=h.replace('</head>','<link rel="stylesheet" href="pass27.css"><link rel="stylesheet" href="pass28.css"></head>');
+  h=h.replace('</head>','<link rel="stylesheet" href="pass27.css"><link rel="stylesheet" href="pass28.css"><link rel="stylesheet" href="pass29.css"></head>');
   h=h.replace('</body>','<script src="pass28.js"></'+'script></body>');
   document.open();document.write(h);document.close();
 }catch(e){const s=document.getElementById('s');if(s)s.innerHTML='<div><b>Load failed</b><br><pre style="white-space:pre-wrap;max-width:90vw">'+String(e)+'</pre></div>';console.error(e)}})();
