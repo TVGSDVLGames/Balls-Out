@@ -1,0 +1,19 @@
+/* PASS32 — clean materials, no speckle/noise */
+.machine{background-image:linear-gradient(180deg,#3b3e42 0%,#2b2d31 16%,#202327 58%,#181a1d 100%)!important;background-color:#202327!important;box-shadow:0 28px 80px #000,inset 0 0 0 1px #5c6166!important}
+.panel,.productView,.editor,.hwpanel,.qolbar,.seqwrap{background:linear-gradient(180deg,rgba(16,18,21,.96),rgba(9,10,12,.92))!important;border:1px solid #4a4f55!important;box-shadow:inset 0 1px #6b7177,0 10px 24px #0006!important}
+.productNav{background:linear-gradient(180deg,#11141a,#090b0f)!important;border-color:#394049!important;box-shadow:inset 0 1px #59616b,0 6px 18px #0008!important}
+.productNav button,.transport button,.qolbar button,.routeBtn,.utilityBtn,.viewBtn,.modelBtn,.p20HwKey{background-image:none!important;background:linear-gradient(180deg,#f1eee4 0%,#ded8cc 45%,#bfb7aa 100%)!important;border:1px solid #6f6a61!important;border-radius:12px!important;box-shadow:inset 0 1px #fff8,inset 0 -2px 0 #918879,0 2px 8px #0004!important;color:#0f1317!important;text-shadow:none!important}
+.productNav button small,.viewBtn small{color:#4d5862!important}
+.modelBtn.active,.productNav button.active,.viewBtn.active,.routeBtn.active,.utilityBtn.active,.modeToggle.active{background:linear-gradient(180deg,#f5f7fb 0%,#d6e8f6 18%,#7ac8f0 70%,#4aa8da 100%)!important;border-color:#6bc9f4!important;box-shadow:0 0 0 2px #7bd7ff,inset 0 1px #fff,inset 0 -2px 0 #2e6e8d,0 4px 12px #0005!important;color:#07131b!important}
+#playBtn{background:linear-gradient(180deg,#a1ff7b 0%,#6ce85b 48%,#42b743 100%)!important;border-color:#3d8d43!important;color:#7a2020!important;font-weight:900!important}
+#stopBtn{background:linear-gradient(180deg,#fbfaf3 0%,#ece7d8 52%,#d0c8b7 100%)!important;border-color:#8f8879!important;color:#1d2126!important}
+#tapBtn{background:linear-gradient(180deg,#f3f7fb 0%,#dbe4ec 52%,#b8c2ce 100%)!important;border-color:#75808d!important;color:#0f1419!important}
+#clearBtn,#panicBtn{background:linear-gradient(180deg,#ff9f92 0%,#ff7266 48%,#e04d43 100%)!important;border-color:#9f413c!important;color:#1a0808!important;font-weight:900!important}
+#hatTestBtn{background:linear-gradient(180deg,#f7df8f 0%,#d8b450 55%,#aa8530 100%)!important;border-color:#866929!important;color:#231806!important}
+.pad{background-image:none!important;background:linear-gradient(180deg,#f2efe7 0%,#ddd8cc 48%,#bdb5a7 100%)!important;border:1px solid #736d62!important;border-radius:12px!important;box-shadow:inset 0 1px #fff8,inset 0 -2px 0 #8c8477,0 2px 9px #0004!important;color:#101418!important}
+.pad:active,.pad.hit{background:linear-gradient(180deg,#ff9c90 0%,#ff756a 46%,#da5248 100%)!important;border-color:#9d423d!important;color:#200a09!important}
+.pad.muted{filter:grayscale(.25) brightness(.82)!important}.pad.soloed{outline:2px solid #f4d264!important;outline-offset:-5px!important}
+.pname,.vname{color:#0f1418!important;text-shadow:none!important}.vname{opacity:.72!important}
+.lcd{background-image:none!important;background:linear-gradient(180deg,#0e0f0f 0%,#171717 12%,#7f6228 13%,#b98f43 18%,#8b6a2c 100%)!important;border:2px solid #50473a!important;box-shadow:inset 0 0 0 2px #060606,inset 0 2px 10px #000a!important;color:#f4cb65!important;text-shadow:0 1px 0 #5d450e,0 0 8px #d8b14055!important}
+.lcd>div{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+input[type=range]{background:linear-gradient(180deg,#050607,#101317)!important;box-shadow:inset 0 1px 4px #000,0 1px #555!important}
