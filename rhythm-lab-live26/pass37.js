@@ -15,7 +15,7 @@
  function stepDuration(st){
   const bpm=Math.max(20,+document.getElementById('bpm')?.value||120);
   const base=(60/bpm)/4,sw=swingRatioNow();
-  return base*((st&1)?sw*2:(1-sw)*2);
+  return base*((st&1)?(1-sw)*2:sw*2);
  }
  function cleanupScheduledSources(nowStop=false){
   for(const rec of [...scheduledSources]){
