@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#101114">
+<title>Blackjack Vision QA</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root { color-scheme: dark; --bg:#101114; --panel:#191b20; --line:#333842; --text:#f4f5f7; --muted:#9da4b0; --good:#8fe1a6; --warn:#ffd27d; }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,select,input{font:inherit}.app{max-width:760px;margin:auto;padding:12px 12px calc(18px + env(safe-area-inset-bottom))}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}.top h1{font-size:18px;margin:0}.pill{font-size:12px;color:var(--muted)}
+.camwrap{position:relative;background:#050506;border:1px solid var(--line);border-radius:14px;overflow:hidden;aspect-ratio:16/10}
+video{width:100%;height:100%;object-fit:cover;display:block}.zone{position:absolute;border:2px solid rgba(255,255,255,.85);background:rgba(0,0,0,.10);touch-action:none}
+.zone .label{position:absolute;left:0;top:0;background:rgba(0,0,0,.75);padding:3px 6px;font-size:11px;font-weight:700}.zone .handle{position:absolute;width:24px;height:24px;right:-2px;bottom:-2px;border-radius:50%;background:white;border:3px solid #111}
+#dealerZone{left:38%;top:8%;width:24%;height:30%}#playerZone{left:7%;top:56%;width:86%;height:36%}
+.controls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.controls button,.btn{border:1px solid var(--line);background:#24272e;color:white;border-radius:10px;padding:11px 12px;font-weight:700}
+.controls button.primary{background:#f0f1f3;color:#111;border-color:#f0f1f3}.controls button:disabled{opacity:.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.title{font-weight:800}.muted{color:var(--muted);font-size:13px}.hand{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.rank{min-width:42px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#24272e;text-align:center;font-weight:800}.rank.bad{outline:2px solid var(--warn)}
+.addrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.addrow button{padding:7px 9px;border:1px solid var(--line);background:#202329;color:white;border-radius:8px}
+.rec{font-size:34px;font-weight:900;letter-spacing:.5px;margin-top:4px}.why{color:var(--muted);margin-top:4px}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.settings label{font-size:12px;color:var(--muted)}.settings select{width:100%;margin-top:4px;background:#22252b;color:white;border:1px solid var(--line);border-radius:8px;padding:9px}
+.status{margin-top:8px;font-size:12px;color:var(--muted);min-height:18px}canvas{display:none}
+.smallbtn{border:1px solid var(--line);background:#24272e;color:white;border-radius:8px;padding:7px 9px}
+@media(max-width:480px){.rec{font-size:30px}.settings{grid-template-columns:1fr 1fr}.app{padding:8px}.card{padding:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <h1>Blackjack Vision QA</h1>
+    <div class="pill">4–8 deck basic strategy</div>
+  </div>
+
+  <div class="camwrap" id="camwrap">
+    <video id="video" playsinline muted></video>
+    <div class="zone" id="dealerZone"><span class="label">DEALER UPCARD</span><span class="handle"></span></div>
+    <div class="zone" id="playerZone"><span class="label">PLAYER CARDS</span><span class="handle"></span></div>
+  </div>
+  <canvas id="cap"></canvas>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">START</button>
+    <button id="scanBtn" disabled>SCAN</button>
+    <button id="autoBtn" disabled>AUTO: OFF</button>
+    <button id="clearBtn">CLEAR</button>
+  </div>
+
+  <div class="card">
+    <div class="row"><div><div class="title">MOVE</div><div class="muted" id="summary">Press START</div></div><button class="smallbtn" id="swapBtn">Swap</button></div>
+    <div class="rec" id="rec">—</div>
+    <div class="why" id="why">Hit / Stand / Double / Split / Surrender</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><div class="title">Dealer</div><div class="muted" id="dealerOcr">—</div></div>
+    <div class="hand" id="dealerHand"></div>
+    <div class="addrow" id="dealerAdd"></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><div class="title">Player</div><div class="muted" id="playerOcr">—</div></div>
+    <div class="hand" id="playerHand"></div>
+    <div class="addrow" id="playerAdd"></div>
+  </div>
+
+  <div class="card">
+    <div class="title">Rules</div>
+    <div class="settings">
+      <label>Profile<select id="decks"><option value="4-8">4–8 decks</option></select></label>
+      <label>Dealer soft 17<select id="soft17"><option value="S17">Stands</option><option value="H17">Hits</option></select></label>
+      <label>Double after split<select id="das"><option value="yes">Allowed</option><option value="no">Not allowed</option></select></label>
+      <label>Late surrender<select id="surrender"><option value="yes">Allowed</option><option value="no">Not allowed</option></select></label>
+    </div>
+    <div class="status" id="status">Aim the top box at the dealer up-card and the bottom box at your hand.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const video=document.getElementById('video'), cap=document.getElementById('cap'), ctx=cap.getContext('2d',{willReadFrequently:true});
+const startBtn=document.getElementById('startBtn'), scanBtn=document.getElementById('scanBtn'), autoBtn=document.getElementById('autoBtn');
+const statusEl=document.getElementById('status'), recEl=document.getElementById('rec'), summaryEl=document.getElementById('summary'), whyEl=document.getElementById('why');
+let player=[], dealer=[], worker=null, scanning=false, autoTimer=null;
+let history={player:[],dealer:[]};
+
+function makeZoneInteractive(el){
+  let mode=null,sx=0,sy=0,sl=0,st=0,sw=0,sh=0;
+  const parent=el.parentElement, handle=el.querySelector('.handle');
+  const down=(e,m)=>{e.preventDefault();mode=m;const p=e.touches?e.touches[0]:e;sx=p.clientX;sy=p.clientY;sl=el.offsetLeft;st=el.offsetTop;sw=el.offsetWidth;sh=el.offsetHeight;window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true});}
+  const move=e=>{if(!mode)return;const pr=parent.getBoundingClientRect();const dx=e.clientX-sx,dy=e.clientY-sy;if(mode==='move'){el.style.left=Math.max(0,Math.min(pr.width-sw,sl+dx))+'px';el.style.top=Math.max(0,Math.min(pr.height-sh,st+dy))+'px';}else{el.style.width=Math.max(70,Math.min(pr.width-sl,sw+dx))+'px';el.style.height=Math.max(45,Math.min(pr.height-st,sh+dy))+'px';}}
+  const up=()=>{mode=null;window.removeEventListener('pointermove',move);}
+  el.addEventListener('pointerdown',e=>{if(e.target===handle)return;down(e,'move')});handle.addEventListener('pointerdown',e=>down(e,'resize'));
+}
+makeZoneInteractive(document.getElementById('dealerZone'));makeZoneInteractive(document.getElementById('playerZone'));
+
+async function startCamera(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+    video.srcObject=stream; await video.play(); scanBtn.disabled=false;autoBtn.disabled=false;startBtn.textContent='RUNNING';startBtn.disabled=true;
+    statusEl.textContent='Aim the top box at the dealer up-card and the bottom box at your cards. Auto-scan is starting.';
+    if(!autoTimer){autoTimer=setInterval(scan,2200);autoBtn.textContent='AUTO: ON';setTimeout(scan,450);}
+  }catch(e){statusEl.textContent='Camera failed: '+e.message+' — Camera requires HTTPS (or localhost).';}
+}
+startBtn.onclick=startCamera;
+
+async function getWorker(){
+  if(worker) return worker;
+  statusEl.textContent='Loading generic OCR…';
+  worker=await Tesseract.createWorker('eng',1,{logger:m=>{if(m.status==='recognizing text') statusEl.textContent='Reading ranks… '+Math.round((m.progress||0)*100)+'%';}});
+  await worker.setParameters({
+    tessedit_char_whitelist:'A23456789TJQK10',
+    tessedit_pageseg_mode:'11',
+    preserve_interword_spaces:'1',
+    user_defined_dpi:'300'
+  });
+  return worker;
+}
+function cropZone(zone){
+  const vr=video.getBoundingClientRect(), zr=zone.getBoundingClientRect();
+  const sx=(zr.left-vr.left)/vr.width*video.videoWidth, sy=(zr.top-vr.top)/vr.height*video.videoHeight;
+  const sw=zr.width/vr.width*video.videoWidth, sh=zr.height/vr.height*video.videoHeight;
+  const scale=Math.min(3,Math.max(1,1200/sw)); cap.width=Math.max(1,Math.round(sw*scale));cap.height=Math.max(1,Math.round(sh*scale));
+  ctx.drawImage(video,sx,sy,sw,sh,0,0,cap.width,cap.height);
+  return cap.toDataURL('image/jpeg',.92);
+}
+function parseRanks(text){
+  text=(text||'').toUpperCase().replace(/[|!IL]/g,'1').replace(/O/g,'0').replace(/[^A-Z0-9\s]/g,' ');
+  const raw=text.match(/10|[2-9AJQKT]/g)||[];
+  return raw.map(x=>x==='T'?'10':x).filter(x=>RANKS.includes(x)).slice(0,8);
+}
+function key(a){return a.join(',')}
+function consensus(which, arr){
+  const h=history[which]; h.push(arr); if(h.length>5)h.shift();
+  const counts={}; for(const x of h){const k=key(x);counts[k]=(counts[k]||0)+1}
+  let best=arr,bn=0;for(const x of h){if((counts[key(x)]||0)>bn){best=x;bn=counts[key(x)]}}
+  return best;
+}
+async function ocrZone(zone,which){
+  const w=await getWorker(); const img=cropZone(zone);
+  const ret=await w.recognize(img,{rotateAuto:true},{text:true});
+  const ranks=parseRanks(ret.data.text);
+  document.getElementById(which+'Ocr').textContent='OCR: '+(ranks.length?ranks.join(' '):'no rank found');
+  return consensus(which,ranks);
+}
+async function scan(){
+  if(scanning||!video.videoWidth)return; scanning=true;scanBtn.disabled=true;
+  try{
+    const d=await ocrZone(document.getElementById('dealerZone'),'dealer');
+    const p=await ocrZone(document.getElementById('playerZone'),'player');
+    if(d.length) dealer=[d[0]]; if(p.length) player=p;
+    render();
+    statusEl.textContent='Scan complete. Tap any recognized card to cycle it if OCR was wrong.';
+  }catch(e){statusEl.textContent='OCR error: '+e.message}
+  finally{scanning=false;scanBtn.disabled=false;}
+}
+scanBtn.onclick=scan;
+autoBtn.onclick=()=>{if(autoTimer){clearInterval(autoTimer);autoTimer=null;autoBtn.textContent='AUTO: OFF'}else{autoTimer=setInterval(scan,2200);autoBtn.textContent='AUTO: ON';scan();}}
+document.getElementById('clearBtn').onclick=()=>{player=[];dealer=[];history={player:[],dealer:[]};render()}
+document.getElementById('swapBtn').onclick=()=>{
+  const a=document.getElementById('dealerZone'),b=document.getElementById('playerZone');
+  const ar=a.getBoundingClientRect(), br=b.getBoundingClientRect(), pr=a.parentElement.getBoundingClientRect();
+  const A={left:ar.left-pr.left,top:ar.top-pr.top,width:ar.width,height:ar.height};
+  const B={left:br.left-pr.left,top:br.top-pr.top,width:br.width,height:br.height};
+  Object.assign(a.style,{left:B.left+'px',top:B.top+'px',width:B.width+'px',height:B.height+'px'});
+  Object.assign(b.style,{left:A.left+'px',top:A.top+'px',width:A.width+'px',height:A.height+'px'});
+}
+
+function rankValue(r){if(r==='A')return 11;if(['K','Q','J','10'].includes(r))return 10;return +r}
+function handInfo(cards){
+  let total=cards.reduce((s,r)=>s+rankValue(r),0), aces=cards.filter(r=>r==='A').length;
+  while(total>21&&aces){total-=10;aces--}
+  const soft=aces>0;
+  const pair=cards.length===2 && rankValue(cards[0])===rankValue(cards[1]);
+  return {total,soft,pair,pairRank:cards[0]};
+}
+function upVal(r){return r==='A'?11:rankValue(r)}
+
+function surrenderAction(info,d,h17){
+  if(document.getElementById('surrender').value!=='yes'||player.length!==2)return null;
+  const t=info.total;
+  const pair8=info.pair && rankValue(info.pairRank)===8;
+  if(!h17){
+    if(t===16 && !pair8 && [9,10,11].includes(d)) return 'SURRENDER';
+    if(t===15 && d===10) return 'SURRENDER';
+  }else{
+    if(pair8 && d===11) return 'SURRENDER';
+    if(t===17 && d===11) return 'SURRENDER';
+    if(t===16 && !pair8 && [9,10,11].includes(d)) return 'SURRENDER';
+    if(t===15 && [10,11].includes(d)) return 'SURRENDER';
+  }
+  return null;
+}
+function pairAction(r,d,das){
+  const v=rankValue(r);
+  if(v===11)return 'SPLIT';
+  if(v===10)return 'STAND';
+  if(v===9)return ([2,3,4,5,6,8,9].includes(d)?'SPLIT':'STAND');
+  if(v===8)return 'SPLIT';
+  if(v===7)return d<=7?'SPLIT':'HIT';
+  if(v===6)return d<=6 && (das||d>=3)?'SPLIT':'HIT';
+  if(v===5)return d>=2&&d<=9?'DOUBLE':'HIT';
+  if(v===4)return das&&[5,6].includes(d)?'SPLIT':'HIT';
+  if([2,3].includes(v))return ((das&&d<=7&&d>=2)||(!das&&d>=4&&d<=7))?'SPLIT':'HIT';
+  return null;
+}
+function softAction(total,d,h17){
+  if(total<=14)return [5,6].includes(d)?'DOUBLE':'HIT';
+  if(total<=16)return [4,5,6].includes(d)?'DOUBLE':'HIT';
+  if(total===17)return [3,4,5,6].includes(d)?'DOUBLE':'HIT';
+  if(total===18){
+    if(h17 && d===2)return 'DOUBLE';
+    if([3,4,5,6].includes(d))return 'DOUBLE';
+    if([2,7,8].includes(d))return 'STAND';
+    return 'HIT';
+  }
+  if(total===19){if(h17&&d===6)return 'DOUBLE';return 'STAND'}
+  return 'STAND';
+}
+function hardAction(total,d,h17){
+  if(total>=17)return 'STAND';
+  if(total>=13)return d>=2&&d<=6?'STAND':'HIT';
+  if(total===12)return d>=4&&d<=6?'STAND':'HIT';
+  if(total===11)return (d<=10 || (h17&&d===11))?'DOUBLE':'HIT';
+  if(total===10)return d>=2&&d<=9?'DOUBLE':'HIT';
+  if(total===9)return d>=3&&d<=6?'DOUBLE':'HIT';
+  return 'HIT';
+}
+function recommend(){
+  if(!player.length||!dealer.length)return {a:'—',s:'Press START',w:'MOVE updates immediately after recognition/manual correction.'};
+  const info=handInfo(player), d=upVal(dealer[0]), h17=document.getElementById('soft17').value==='H17', das=document.getElementById('das').value==='yes';
+  if(info.total>21)return {a:'BUST',s:`Player ${info.total} vs dealer ${dealer[0]}`,w:'Hand is already over 21.'};
+  const sur=surrenderAction(info,d,h17); if(sur)return {a:sur,s:`${info.soft?'Soft ':''}${info.total} vs ${dealer[0]}`,w:'Verified 4–8 deck total-dependent basic strategy.'};
+  let a=null;
+  if(info.pair && player.length===2)a=pairAction(info.pairRank,d,das);
+  if(!a)a=info.soft?softAction(info.total,d,h17):hardAction(info.total,d,h17);
+  if(a==='DOUBLE' && player.length!==2)a='HIT';
+  return {a,s:`${info.soft?'Soft ':''}${info.total} vs dealer ${dealer[0]}`,w:'Verified 4–8 deck total-dependent basic strategy.'};
+}
+function cycle(which,i){
+  const arr=which==='player'?player:dealer, n=(RANKS.indexOf(arr[i])+1)%RANKS.length;arr[i]=RANKS[n];render()
+}
+function renderHand(which,arr){
+  const el=document.getElementById(which+'Hand');el.innerHTML='';
+  arr.forEach((r,i)=>{const b=document.createElement('button');b.className='rank';b.textContent=r;b.title='Tap to cycle rank';b.onclick=()=>cycle(which,i);b.oncontextmenu=e=>{e.preventDefault();arr.splice(i,1);render()};el.appendChild(b)});
+  if(!arr.length)el.innerHTML='<span class="muted">none</span>';
+}
+function buildAdd(which){
+  const el=document.getElementById(which+'Add');el.innerHTML='';
+  RANKS.forEach(r=>{const b=document.createElement('button');b.textContent='+'+r;b.onclick=()=>{const arr=which==='player'?player:dealer;if(which==='dealer')arr.splice(0,arr.length,r);else arr.push(r);render()};el.appendChild(b)});
+}
+function render(){
+  renderHand('dealer',dealer);renderHand('player',player);
+  const x=recommend();recEl.textContent=x.a;summaryEl.textContent=x.s;whyEl.textContent=x.w;
+}
+['soft17','das','surrender'].forEach(id=>document.getElementById(id).onchange=render);
+buildAdd('dealer');buildAdd('player');render();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
