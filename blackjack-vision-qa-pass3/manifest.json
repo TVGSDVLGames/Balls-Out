@@ -1,0 +1,9 @@
+{
+  "name": "Blackjack Vision QA",
+  "short_name": "BJ Vision QA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#101114",
+  "theme_color": "#101114",
+  "icons": []
+}
