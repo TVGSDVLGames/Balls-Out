@@ -1,0 +1,166 @@
++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'); const MATRIX=[["COPY", "OFFSET", "SWING", "QUANT", "LENGTH", "PATT", "MIDI/UTIL", "TEMPO"], ["DELETE", "INSERT", "SONG", "1", "2", "3", "4", "5"], ["ERASE", "TAPE", "FILL", "6", "7", "8", "9", "0"], ["PLAY", "STOP/CONTINUE", "RECORD", "< -", "> +", "VOICE", "TUNE", "MIX"], ["TOM 1", "TOM 2", "TOM 3", "TOM 4", "RIDE", "CRASH", "PERC 1", "PERC 2"], ["KICK", "SNARE", "CLOSED HAT", "MID HAT", "OPEN HAT", "CLAPS", "PERC 3", "PERC 4"]]; function b64(s){const x=atob(s),u=new Uint8Array(x.length);for(let i=0;i<x.length;i++)u[i]=x.charCodeAt(i);return u}
+class MCS51 {
+  constructor(code, hooks={}) {
+    this.code=code; this.hooks=hooks; this.iram=new Uint8Array(128); this.sfr=new Uint8Array(128); this.xram=new Uint8Array(65536);
+    this.reset();
+  }
+  reset(){this.iram.fill(0);this.sfr.fill(0);this.xram.fill(0);this.pc=0;this.cycles=0;this.sfr[0x01]=7;
+    this.sfr[0x00]=0xff;this.sfr[0x10]=0xff;this.sfr[0x20]=0xff;this.sfr[0x30]=0xff;
+    this.interruptLevel=0;this.lastP3=0xff;
+  }
+  code8(a){return this.code[(a&0xffff)&(this.code.length-1)]||0}
+  fetch(){const v=this.code8(this.pc);this.pc=(this.pc+1)&0xffff;return v}
+  fetch16(){const h=this.fetch(),l=this.fetch();return (h<<8)|l}
+  rel(){let r=this.fetch();if(r&0x80)r-=256;return r}
+  sfrIndex(a){return (a-0x80)&0x7f}
+  readDirect(a){a&=255;if(a<0x80)return this.iram[a];
+    const i=this.sfrIndex(a); if(a===0x90&&this.hooks.portRead)return this.hooks.portRead(1,this.sfr[i])&255;
+    if(a===0xb0&&this.hooks.portRead)return this.hooks.portRead(3,this.sfr[i])&255;
+    return this.sfr[i];}
+  writeDirect(a,v){a&=255;v&=255;if(a<0x80){this.iram[a]=v;return;} const i=this.sfrIndex(a);this.sfr[i]=v;
+    if((a===0x80||a===0x90||a===0xa0||a===0xb0)&&this.hooks.portWrite)this.hooks.portWrite((a-0x80)>>4,v);
+    if(a===0x99&&this.hooks.serialWrite)this.hooks.serialWrite(v);
+  }
+  readIndirect(a){a&=255;return a<0x80?this.iram[a]:0xff}
+  writeIndirect(a,v){a&=255;if(a<0x80)this.iram[a]=v&255}
+  bank(){return ((this.sfr[this.sfrIndex(0xd0)]>>3)&3)*8}
+  r(n){return this.iram[this.bank()+n]}
+  setr(n,v){this.iram[this.bank()+n]=v&255}
+  get A(){return this.sfr[this.sfrIndex(0xe0)]}
+  set A(v){this.sfr[this.sfrIndex(0xe0)]=v&255;this.updateParity()}
+  get B(){return this.sfr[this.sfrIndex(0xf0)]}
+  set B(v){this.sfr[this.sfrIndex(0xf0)]=v&255}
+  get PSW(){return this.sfr[this.sfrIndex(0xd0)]}
+  set PSW(v){this.sfr[this.sfrIndex(0xd0)]=v&255;this.updateParity()}
+  get SP(){return this.sfr[1]}
+  set SP(v){this.sfr[1]=v&255}
+  get DPTR(){return (this.sfr[3]<<8)|this.sfr[2]}
+  set DPTR(v){this.sfr[3]=(v>>8)&255;this.sfr[2]=v&255}
+  updateParity(){let a=this.sfr[this.sfrIndex(0xe0)],p=0;for(let i=0;i<8;i++)p^=(a>>i)&1;let psw=this.sfr[this.sfrIndex(0xd0)];this.sfr[this.sfrIndex(0xd0)]=(psw&0xfe)|p}
+  flag(mask){return (this.PSW&mask)?1:0}
+  setFlag(mask,on){let p=this.PSW;if(on)p|=mask;else p&=~mask;this.PSW=p}
+  getBit(b){b&=255;if(b<0x80){const a=0x20+(b>>3);return (this.iram[a]>>(b&7))&1}const a=b&0xf8;return (this.readDirect(a)>>(b&7))&1}
+  setBit(b,v){b&=255;if(b<0x80){const a=0x20+(b>>3),m=1<<(b&7);this.iram[a]=v?(this.iram[a]|m):(this.iram[a]&~m);return}const a=b&0xf8,m=1<<(b&7),x=this.readDirect(a);this.writeDirect(a,v?(x|m):(x&~m))}
+  push(v){this.SP=(this.SP+1)&255;if(this.SP<128)this.iram[this.SP]=v&255}
+  pop(){const a=this.SP,v=a<128?this.iram[a]:0xff;this.SP=(a-1)&255;return v}
+  call(addr){this.push(this.pc&255);this.push((this.pc>>8)&255);this.pc=addr&0xffff}
+  ret(){const hi=this.pop(),lo=this.pop();this.pc=((hi<<8)|lo)&0xffff}
+  add(v,c=0){const a=this.A,vv=v&255,cc=c?1:0,s=a+vv+cc,r=s&255;this.setFlag(0x80,s>255);this.setFlag(0x40,((a&15)+(vv&15)+cc)>15);this.setFlag(0x04,((~(a^vv)&(a^r))&0x80)!==0);this.A=r}
+  sub(v,c=0){const a=this.A,vv=v&255,cc=c?1:0,d=a-vv-cc,r=d&255;this.setFlag(0x80,d<0);this.setFlag(0x40,(a&15)<((vv&15)+cc));this.setFlag(0x04,(((a^vv)&(a^r))&0x80)!==0);this.A=r}
+  xread(a){a&=0xffff;if(this.hooks.xread)return this.hooks.xread(a,this.xram[a])&255;return this.xram[a]}
+  xwrite(a,v){a&=0xffff;v&=255;if(this.hooks.xwrite)this.hooks.xwrite(a,v);else this.xram[a]=v}
+  branch(cond,rel){if(cond)this.pc=(this.pc+rel)&0xffff}
+  timerAdvance(n){
+    const TMOD=this.sfr[9], TCONi=8; let TCON=this.sfr[TCONi];
+    for(let z=0;z<n;z++){
+      if((TCON&0x10) && !(TMOD&0x04)){
+        const mode=TMOD&3;
+        if(mode===1){let v=(this.sfr[12]<<8)|this.sfr[10];v=(v+1)&0xffff;this.sfr[12]=v>>8;this.sfr[10]=v&255;if(v===0)TCON|=0x20}
+        else if(mode===2){let v=(this.sfr[10]+1)&255;if(v===0){v=this.sfr[12];TCON|=0x20}this.sfr[10]=v}
+        else if(mode===0){let v=((this.sfr[12]<<5)|(this.sfr[10]&31))+1;if(v>=8192){v&=8191;TCON|=0x20}this.sfr[12]=(v>>5)&255;this.sfr[10]=(this.sfr[10]&0xe0)|(v&31)}
+        else {let v=(this.sfr[10]+1)&255;if(v===0)TCON|=0x20;this.sfr[10]=v}
+      }
+      if((TCON&0x40) && !(TMOD&0x40)){
+        const mode=(TMOD>>4)&3;
+        if(mode===1){let v=(this.sfr[13]<<8)|this.sfr[11];v=(v+1)&0xffff;this.sfr[13]=v>>8;this.sfr[11]=v&255;if(v===0)TCON|=0x80}
+        else if(mode===2){let v=(this.sfr[11]+1)&255;if(v===0){v=this.sfr[13];TCON|=0x80}this.sfr[11]=v}
+        else if(mode===0){let v=((this.sfr[13]<<5)|(this.sfr[11]&31))+1;if(v>=8192){v&=8191;TCON|=0x80}this.sfr[13]=(v>>5)&255;this.sfr[11]=(this.sfr[11]&0xe0)|(v&31)}
+      }
+    }this.sfr[TCONi]=TCON;
+  }
+  checkInterrupt(){const IE=this.sfr[0x28],IP=this.sfr[0x38],TCON=this.sfr[8];if(!(IE&0x80))return;let vec=-1,pri=0,mask=0;
+    const cand=[[0x01,0x02,0x03,0x01],[0x02,0x20,0x0b,0x02],[0x04,0x08,0x13,0x04],[0x08,0x80,0x1b,0x08]];
+    for(const [ie,fl,v,ip] of cand){if((IE&ie)&&(TCON&fl)){const p=(IP&ip)?2:1;if(p>this.interruptLevel && p>pri){vec=v;pri=p;mask=fl}}}
+    if(vec>=0){this.push(this.pc&255);this.push(this.pc>>8);this.pc=vec;this.interruptLevel=pri;if(mask===0x20||mask===0x80)this.sfr[8]&=~mask;}
+  }
+  step(){const start=this.pc,op=this.fetch();let cyc=1, r, d, rel, bit, v, a, carry=this.flag(0x80); const rn=op&7;
+    if(op>=0x08&&op<=0x0f){this.setr(rn,this.r(rn)+1)}
+    else if(op>=0x18&&op<=0x1f){this.setr(rn,this.r(rn)-1)}
+    else if(op>=0x28&&op<=0x2f){this.add(this.r(rn))}
+    else if(op>=0x38&&op<=0x3f){this.add(this.r(rn),carry)}
+    else if(op>=0x48&&op<=0x4f){this.A=this.A|this.r(rn)}
+    else if(op>=0x58&&op<=0x5f){this.A=this.A&this.r(rn)}
+    else if(op>=0x68&&op<=0x6f){this.A=this.A^this.r(rn)}
+    else if(op>=0x78&&op<=0x7f){this.setr(rn,this.fetch())}
+    else if(op>=0x88&&op<=0x8f){d=this.fetch();this.writeDirect(d,this.r(rn))}
+    else if(op>=0x98&&op<=0x9f){this.sub(this.r(rn),carry)}
+    else if(op>=0xa8&&op<=0xaf){d=this.fetch();this.setr(rn,this.readDirect(d))}
+    else if(op>=0xb8&&op<=0xbf){v=this.fetch();rel=this.rel();this.setFlag(0x80,this.r(rn)<v);this.branch(this.r(rn)!==v,rel);cyc=2}
+    else if(op>=0xc8&&op<=0xcf){v=this.r(rn);this.setr(rn,this.A);this.A=v}
+    else if(op>=0xd8&&op<=0xdf){rel=this.rel();v=(this.r(rn)-1)&255;this.setr(rn,v);this.branch(v!==0,rel);cyc=2}
+    else if(op>=0xe8&&op<=0xef){this.A=this.r(rn)}
+    else if(op>=0xf8&&op<=0xff){this.setr(rn,this.A)}
+    else if((op&0x1f)===0x01){v=this.fetch();this.pc=(this.pc&0xf800)|((op&0xe0)<<3)|v;cyc=2}
+    else if((op&0x1f)===0x11){v=this.fetch();a=(this.pc&0xf800)|((op&0xe0)<<3)|v;this.call(a);cyc=2}
+    else switch(op){
+      case 0x00:break; case 0x02:this.pc=this.fetch16();cyc=2;break; case 0x03:this.A=((this.A>>1)|((this.A&1)<<7));break; case 0x04:this.A=this.A+1;break;
+      case 0x05:d=this.fetch();this.writeDirect(d,this.readDirect(d)+1);break; case 0x06:case 0x07:r=op&1;a=this.r(r);this.writeIndirect(a,this.readIndirect(a)+1);break;
+      case 0x10:bit=this.fetch();rel=this.rel();if(this.getBit(bit)){this.setBit(bit,0);this.branch(true,rel)}cyc=2;break; case 0x12:a=this.fetch16();this.call(a);cyc=2;break;
+      case 0x13:{const x=this.A,c=this.flag(0x80);this.setFlag(0x80,x&1);this.A=(x>>1)|(c<<7)}break; case 0x14:this.A=this.A-1;break;
+      case 0x15:d=this.fetch();this.writeDirect(d,this.readDirect(d)-1);break; case 0x16:case 0x17:r=op&1;a=this.r(r);this.writeIndirect(a,this.readIndirect(a)-1);break;
+      case 0x20:bit=this.fetch();rel=this.rel();this.branch(this.getBit(bit),rel);cyc=2;break; case 0x22:this.ret();cyc=2;break; case 0x23:this.A=((this.A<<1)|(this.A>>7));break;
+      case 0x24:this.add(this.fetch());break; case 0x25:this.add(this.readDirect(this.fetch()));break; case 0x26:case 0x27:this.add(this.readIndirect(this.r(op&1)));break;
+      case 0x30:bit=this.fetch();rel=this.rel();this.branch(!this.getBit(bit),rel);cyc=2;break; case 0x32:this.ret();this.interruptLevel=0;cyc=2;break;
+      case 0x33:{const x=this.A,c=this.flag(0x80);this.setFlag(0x80,x&0x80);this.A=((x<<1)&255)|c}break; case 0x34:this.add(this.fetch(),carry);break;
+      case 0x35:this.add(this.readDirect(this.fetch()),carry);break; case 0x36:case 0x37:this.add(this.readIndirect(this.r(op&1)),carry);break;
+      case 0x40:rel=this.rel();this.branch(this.flag(0x80),rel);cyc=2;break; case 0x42:d=this.fetch();this.writeDirect(d,this.readDirect(d)|this.A);break;
+      case 0x43:d=this.fetch();v=this.fetch();this.writeDirect(d,this.readDirect(d)|v);break; case 0x44:this.A=this.A|this.fetch();break; case 0x45:this.A=this.A|this.readDirect(this.fetch());break;
+      case 0x46:case 0x47:this.A=this.A|this.readIndirect(this.r(op&1));break; case 0x50:rel=this.rel();this.branch(!this.flag(0x80),rel);cyc=2;break;
+      case 0x52:d=this.fetch();this.writeDirect(d,this.readDirect(d)&this.A);break; case 0x53:d=this.fetch();v=this.fetch();this.writeDirect(d,this.readDirect(d)&v);break;
+      case 0x54:this.A=this.A&this.fetch();break; case 0x55:this.A=this.A&this.readDirect(this.fetch());break; case 0x56:case 0x57:this.A=this.A&this.readIndirect(this.r(op&1));break;
+      case 0x60:rel=this.rel();this.branch(this.A===0,rel);cyc=2;break; case 0x62:d=this.fetch();this.writeDirect(d,this.readDirect(d)^this.A);break;
+      case 0x63:d=this.fetch();v=this.fetch();this.writeDirect(d,this.readDirect(d)^v);break; case 0x64:this.A=this.A^this.fetch();break; case 0x65:this.A=this.A^this.readDirect(this.fetch());break;
+      case 0x66:case 0x67:this.A=this.A^this.readIndirect(this.r(op&1));break; case 0x70:rel=this.rel();this.branch(this.A!==0,rel);cyc=2;break;
+      case 0x72:bit=this.fetch();this.setFlag(0x80,this.flag(0x80)|this.getBit(bit));cyc=2;break; case 0x73:this.pc=(this.DPTR+this.A)&0xffff;cyc=2;break;
+      case 0x74:this.A=this.fetch();break; case 0x75:d=this.fetch();v=this.fetch();this.writeDirect(d,v);break; case 0x76:case 0x77:this.writeIndirect(this.r(op&1),this.fetch());break;
+      case 0x80:rel=this.rel();this.branch(true,rel);cyc=2;break; case 0x82:bit=this.fetch();this.setFlag(0x80,this.flag(0x80)&this.getBit(bit));cyc=2;break;
+      case 0x83:this.A=this.code8((this.pc+this.A)&0xffff);cyc=2;break;
+      case 0x84:{const b=this.B;if(b===0){this.setFlag(0x04,1);this.setFlag(0x80,0)}else{const q=Math.floor(this.A/b),rem=this.A%b;this.A=q;this.B=rem;this.setFlag(0x04,0);this.setFlag(0x80,0)}cyc=4}break;
+      case 0x85:{const src=this.fetch(),dst=this.fetch();this.writeDirect(dst,this.readDirect(src))}break; case 0x86:case 0x87:d=this.fetch();this.writeDirect(d,this.readIndirect(this.r(op&1)));break;
+      case 0x90:this.DPTR=this.fetch16();cyc=2;break; case 0x92:bit=this.fetch();this.setBit(bit,this.flag(0x80));cyc=2;break; case 0x93:this.A=this.code8((this.DPTR+this.A)&0xffff);cyc=2;break;
+      case 0x94:this.sub(this.fetch(),carry);break; case 0x95:this.sub(this.readDirect(this.fetch()),carry);break; case 0x96:case 0x97:this.sub(this.readIndirect(this.r(op&1)),carry);break;
+      case 0xa0:bit=this.fetch();this.setFlag(0x80,this.flag(0x80)|(!this.getBit(bit)));cyc=2;break; case 0xa2:bit=this.fetch();this.setFlag(0x80,this.getBit(bit));cyc=2;break;
+      case 0xa3:this.DPTR=(this.DPTR+1)&0xffff;cyc=2;break; case 0xa4:{const p=this.A*this.B;this.A=p&255;this.B=(p>>8)&255;this.setFlag(0x80,0);this.setFlag(0x04,p>255);cyc=4}break;
+      case 0xa5:throw new Error('Illegal opcode A5 at '+start.toString(16)); case 0xa6:case 0xa7:d=this.fetch();this.writeIndirect(this.r(op&1),this.readDirect(d));break;
+      case 0xb0:bit=this.fetch();this.setFlag(0x80,this.flag(0x80)&(!this.getBit(bit)));cyc=2;break; case 0xb2:bit=this.fetch();this.setBit(bit,!this.getBit(bit));break; case 0xb3:this.setFlag(0x80,!this.flag(0x80));break;
+      case 0xb4:v=this.fetch();rel=this.rel();this.setFlag(0x80,this.A<v);this.branch(this.A!==v,rel);cyc=2;break; case 0xb5:d=this.fetch();v=this.readDirect(d);rel=this.rel();this.setFlag(0x80,this.A<v);this.branch(this.A!==v,rel);cyc=2;break;
+      case 0xb6:case 0xb7:v=this.fetch();rel=this.rel();a=this.readIndirect(this.r(op&1));this.setFlag(0x80,a<v);this.branch(a!==v,rel);cyc=2;break;
+      case 0xc0:d=this.fetch();this.push(this.readDirect(d));cyc=2;break; case 0xc2:this.setBit(this.fetch(),0);break; case 0xc3:this.setFlag(0x80,0);break;
+      case 0xc4:this.A=((this.A&15)<<4)|(this.A>>4);break; case 0xc5:d=this.fetch();v=this.readDirect(d);this.writeDirect(d,this.A);this.A=v;break;
+      case 0xc6:case 0xc7:a=this.r(op&1);v=this.readIndirect(a);this.writeIndirect(a,this.A);this.A=v;break; case 0xd0:d=this.fetch();this.writeDirect(d,this.pop());cyc=2;break;
+      case 0xd2:this.setBit(this.fetch(),1);break; case 0xd3:this.setFlag(0x80,1);break;
+      case 0xd4:{let x=this.A,c=this.flag(0x80),ac=this.flag(0x40);if((x&15)>9||ac)x+=6;if((x>0x9f)||c){x+=0x60;c=1}this.A=x;this.setFlag(0x80,c)}break;
+      case 0xd5:d=this.fetch();rel=this.rel();v=(this.readDirect(d)-1)&255;this.writeDirect(d,v);this.branch(v!==0,rel);cyc=2;break;
+      case 0xd6:case 0xd7:a=this.r(op&1);v=this.readIndirect(a);{const al=this.A&15,vl=v&15;this.A=(this.A&0xf0)|vl;this.writeIndirect(a,(v&0xf0)|al)}break;
+      case 0xe0:this.A=this.xread(this.DPTR);cyc=2;break; case 0xe2:case 0xe3:this.A=this.xread(((this.readDirect(0xa0)<<8)|this.r(op&1))&0xffff);cyc=2;break;
+      case 0xe4:this.A=0;break; case 0xe5:this.A=this.readDirect(this.fetch());break; case 0xe6:case 0xe7:this.A=this.readIndirect(this.r(op&1));break;
+      case 0xf0:this.xwrite(this.DPTR,this.A);cyc=2;break; case 0xf2:case 0xf3:this.xwrite(((this.readDirect(0xa0)<<8)|this.r(op&1))&0xffff,this.A);cyc=2;break;
+      case 0xf4:this.A=(~this.A)&255;break; case 0xf5:this.writeDirect(this.fetch(),this.A);break; case 0xf6:case 0xf7:this.writeIndirect(this.r(op&1),this.A);break;
+      default:throw new Error('Unhandled opcode '+op.toString(16)+' at '+start.toString(16));
+    }
+    this.timerAdvance(cyc);this.cycles+=cyc;this.checkInterrupt();return {pc:start,op,cycles:cyc};
+  }
+}
+
+
+const $=id=>document.getElementById(id);let matrixSelect=0xff,columns=new Uint8Array(6);columns.fill(0xff),slider=0;let nvram=new Uint8Array(0x8000),ledByte=0xff,dmBytes=[],lastCmd=null,cmdCount=0;let lcdAddr=0,lcdEntryInc=true,lcdDD=new Uint8Array(0x80);lcdDD.fill(32);let audioCtx=null,audioUnlocked=false,pcmCache=new Map();let cpu=null,running=true,lastFrame=performance.now(),cycleDebt=0;const ledNames=['PATT/SONG','PLAY','RECORD','VOICE','TUNE','MIX','TEMPO','MIDI'];
+function kbRead(){let d=0xff;for(let i=0;i<6;i++)if(((matrixSelect>>i)&1)===0)d&=columns[i];return d}
+function lcdWrite(off,v){if(off===0){if(v&0x80)lcdAddr=v&0x7f;else if(v===0x01){lcdDD.fill(32);lcdAddr=0}else if(v===0x02){lcdAddr=0}else if((v&0xfc)===0x04)lcdEntryInc=!!(v&2)}else{lcdDD[lcdAddr]=v;lcdAddr=(lcdAddr+(lcdEntryInc?1:-1))&0x7f}renderLCD()}
+function lcdRead(off){if(off===0)return lcdAddr&0x7f;const v=lcdDD[lcdAddr];lcdAddr=(lcdAddr+(lcdEntryInc?1:-1))&0x7f;return v}
+function renderLCD(){for(const [id,base] of [['lcd0',0],['lcd1',0x40]]){let s='';for(let i=0;i<16;i++){const c=lcdDD[base+i];s+=c>=32&&c<127?String.fromCharCode(c):' '}$(id).textContent=s}}
+function renderLEDs(){document.querySelectorAll('.led').forEach((e,i)=>{let on;if(i===0)on=!!(ledByte&1);else on=!((ledByte>>i)&1);e.classList.toggle('on',on)})}
+function xread(a){if(a===0)return kbRead();if(a===6||a===7)return lcdRead(a-6);if(a>=0x8000)return nvram[a-0x8000];return 0xff}
+function xwrite(a,v){if(a>=0x8000){nvram[a-0x8000]=v;return}if(a===2){dmWrite(v);return}if(a===4){ledByte=v;renderLEDs();return}if(a===6||a===7){lcdWrite(a-6,v);return}if(a===8){matrixSelect=v;return}}
+function makeCPU(){cpu=new MCS51(FW,{portRead:(p,l)=>p===1?slider:(p===3?0xff:l),xread,xwrite});dmBytes=[];lastCmd=null;cmdCount=0;lcdAddr=0;lcdDD.fill(32);ledByte=0xff;renderLCD();renderLEDs();$('cpuStat').textContent='BOOTING 80C31';$('cpuStat').className='warn'}
+function signed8(b){return b<128?b:b-256}
+function decodeVoice(ptr){if(pcmCache.has(ptr))return pcmCache.get(ptr);let pos=ptr>>>0,shift=8,out=[],guard=0;while(pos<SOUND.length&&guard++<SOUND.length){let s=signed8(SOUND[pos++]);if(s===-128){let n=1;if(shift>0)shift--;while(pos<SOUND.length&&signed8(SOUND[pos])===-128){pos++;n++;if(n>=3){const f=Float32Array.from(out);pcmCache.set(ptr,f);return f}}continue}out.push(-(s*(1<<shift))/32768)}const f=Float32Array.from(out);pcmCache.set(ptr,f);return f}
+function unlockAudio(){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!audioCtx||audioCtx.state==='closed')audioCtx=new AC();if(audioCtx.state!=='running')audioCtx.resume();const b=audioCtx.createBuffer(1,1,48000),s=audioCtx.createBufferSource();s.buffer=b;s.connect(audioCtx.destination);s.start(0);audioUnlocked=true;$('audStat').textContent='UNLOCKED / FIRMWARE DM3AG';$('audStat').className='good'}catch(e){$('audStat').textContent='WEB AUDIO BLOCKED';$('audStat').className='warn'}}
+function playDM(ptr){if(!audioCtx||!audioUnlocked||ptr<=0)return;const pcm=decodeVoice(ptr);if(!pcm.length)return;const b=audioCtx.createBuffer(1,pcm.length,48000);b.copyToChannel(pcm,0);const s=audioCtx.createBufferSource(),g=audioCtx.createGain();s.buffer=b;g.gain.value=.78;s.connect(g);g.connect(audioCtx.destination);s.start()}
+function dmWrite(v){dmBytes.push(v&255);if(dmBytes.length<5)return;const c=dmBytes.splice(0,5),ptr=(c[0]<<12)|(c[1]<<4)|(c[2]>>4);lastCmd={c,ptr,low:c[2]&15,vol:c[3],pan:(c[4]>>5)&7,out:(c[4]&0x10)?1:2};cmdCount++;if(ptr>0)playDM(ptr);updateDebug()}
+function updateDebug(){if(!cpu)return;const pc=cpu.pc.toString(16).padStart(4,'0').toUpperCase();let d=`PC $${pc}   machine cycles ${cpu.cycles.toLocaleString()}   DM3AG packets ${cmdCount}`;if(lastCmd)d+=`\nDM3AG ${lastCmd.c.map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' ')} → ROM $${lastCmd.ptr.toString(16).padStart(5,'0').toUpperCase()}  rawTune=${lastCmd.low} rawVol=$${lastCmd.vol.toString(16).padStart(2,'0')} panBits=${lastCmd.pan} out=${lastCmd.out}`;$('debug').textContent=d}
+function runCycles(n){const end=cpu.cycles+n;let guard=0;try{while(cpu.cycles<end&&guard++<n*2+1000)cpu.step()}catch(e){running=false;$('cpuStat').textContent='CPU ERROR';$('cpuStat').className='warn';$('debug').textContent='CPU ERROR: '+e.message+'\n'+$('debug').textContent;console.error(e)}}
+function frame(t){if(running){const dt=Math.min(0.05,(t-lastFrame)/1000);lastFrame=t;cycleDebt+=dt*1000000;const todo=Math.min(50000,cycleDebt|0);if(todo>0){runCycles(todo);cycleDebt-=todo}if(cpu.cycles>2500000){$('cpuStat').textContent='RUNNING REAL OS';$('cpuStat').className='good'}if((frame.count++&7)===0)updateDebug()}requestAnimationFrame(frame)}frame.count=0;
+function pressMatrix(col,bit,el){unlockAudio();columns[col]&=~(1<<bit);el&&el.classList.add('down');setTimeout(()=>{columns[col]|=(1<<bit);el&&el.classList.remove('down')},85)}
+function buildUI(){const lr=$('ledrow');ledNames.forEach(n=>{const e=document.createElement('span');e.className='led';e.textContent=n;lr.appendChild(e)});for(let c=0;c<4;c++)for(let b=0;b<8;b++){const e=document.createElement('button');e.className='ctrl';e.textContent=MATRIX[c][b];e.onclick=()=>pressMatrix(c,b,e);$('controls').appendChild(e)}for(let c=4;c<6;c++)for(let b=0;b<8;b++){const e=document.createElement('button');e.className='pad';e.textContent=MATRIX[c][b];e.onclick=()=>pressMatrix(c,b,e);$('pads').appendChild(e)}}
+$('slider').oninput=e=>{slider=+e.target.value;$('sliderv').textContent=slider};$('resetBtn').onclick=()=>{unlockAudio();makeCPU();lastFrame=performance.now();cycleDebt=0;running=true};buildUI();makeCPU();requestAnimationFrame(frame);
+</script></body></html>
