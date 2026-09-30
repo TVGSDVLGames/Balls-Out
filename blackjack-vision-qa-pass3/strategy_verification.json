@@ -1,0 +1,9 @@
+{
+  "reference": "Wizard of Odds 4\u20138 deck basic strategy",
+  "profile": "4\u20138 decks; S17/H17; DAS selectable; late surrender selectable",
+  "audit_fixes": [
+    "Surrender applies to hard 15/16/17 only; soft totals are excluded.",
+    "H17 pair 8 vs dealer Ace may surrender when late surrender is offered.",
+    "If a multi-card soft 18/19 lands on a double cell, fallback is stand; lower soft doubles fall back to hit."
+  ]
+}
