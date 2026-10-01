@@ -1,0 +1,26 @@
+{
+  "HR16_B_V2_00.BIN": {
+    "bytes": 32768,
+    "crc32": "19cf0fce"
+  },
+  "HR16_B_U15.BIN": {
+    "bytes": 524288,
+    "crc32": "319746db"
+  },
+  "HR16_B_U16.BIN": {
+    "bytes": 524288,
+    "crc32": "11ca930e"
+  },
+  "SR16_V1_04.BIN": {
+    "bytes": 65536,
+    "crc32": "d049af6e"
+  },
+  "SR16_U5.BIN": {
+    "bytes": 524288,
+    "crc32": "8bb25cfa"
+  },
+  "SR16_U6.BIN": {
+    "bytes": 524288,
+    "crc32": "6da96987"
+  }
+}
