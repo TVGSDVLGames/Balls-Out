@@ -47,6 +47,12 @@ jobs:
             manifest[name]={'bytes':len(data),'crc32':f'{got:08x}'}
           Path('alesis-real-firmware-assets/manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
           PY
+      - name: Upload verified full ROM set
+        uses: actions/upload-artifact@v4
+        with:
+          name: alesis-phase3-full-romset
+          path: alesis-real-firmware-assets/raw/
+          retention-days: 1
       - name: Commit verified bundled assets
         shell: bash
         run: |
