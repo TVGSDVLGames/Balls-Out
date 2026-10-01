@@ -1,0 +1,59 @@
+name: Prepare Alesis firmware assets
+on:
+  push:
+    paths:
+      - '.github/workflows/prepare-alesis-firmware-assets.yml'
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and verify firmware/ROM assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p alesis-real-firmware-assets/raw alesis-real-firmware-assets/b64
+          base='https://burnkit2600.com/hr16'
+          curl -fL --retry 3 "$base/HR16_B_V2_00.BIN" -o alesis-real-firmware-assets/raw/HR16_B_V2_00.BIN
+          curl -fL --retry 3 "$base/HR16_B_U15.BIN" -o alesis-real-firmware-assets/raw/HR16_B_U15.BIN
+          curl -fL --retry 3 "$base/HR16_B_U16.BIN" -o alesis-real-firmware-assets/raw/HR16_B_U16.BIN
+          curl -fL --retry 3 "$base/SR16_V1_04.BIN" -o alesis-real-firmware-assets/raw/SR16_V1_04.BIN
+          curl -fL --retry 3 "$base/SR16_U5.BIN" -o alesis-real-firmware-assets/raw/SR16_U5.BIN
+          curl -fL --retry 3 "$base/SR16_U6.BIN" -o alesis-real-firmware-assets/raw/SR16_U6.BIN
+          python - <<'PY'
+          from pathlib import Path
+          import zlib, base64, json
+          root=Path('alesis-real-firmware-assets/raw')
+          exp={
+            'HR16_B_V2_00.BIN':(32768,0x19cf0fce),
+            'HR16_B_U15.BIN':(524288,0x319746db),
+            'HR16_B_U16.BIN':(524288,0x11ca930e),
+            'SR16_V1_04.BIN':(65536,0xd049af6e),
+            'SR16_U5.BIN':(524288,0x8bb25cfa),
+            'SR16_U6.BIN':(524288,0x6da96987),
+          }
+          manifest={}
+          out=Path('alesis-real-firmware-assets/b64')
+          out.mkdir(parents=True,exist_ok=True)
+          for name,(size,crc) in exp.items():
+            data=(root/name).read_bytes()
+            got=zlib.crc32(data)&0xffffffff
+            print(name,len(data),f'{got:08x}')
+            if len(data)!=size or got!=crc:
+              raise SystemExit(f'CRC/size mismatch for {name}: {len(data)} {got:08x}')
+            (out/(name+'.b64')).write_text(base64.b64encode(data).decode('ascii'))
+            manifest[name]={'bytes':len(data),'crc32':f'{got:08x}'}
+          Path('alesis-real-firmware-assets/manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          PY
+      - name: Commit verified bundled assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf alesis-real-firmware-assets/raw
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add alesis-real-firmware-assets
+          git commit -m 'Bundle verified HR-16B and SR-16 firmware assets' || exit 0
+          git push
