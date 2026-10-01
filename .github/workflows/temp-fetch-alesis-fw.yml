@@ -1,0 +1,42 @@
+name: Temp fetch Alesis firmware
+on:
+  push:
+    paths:
+      - ".github/workflows/temp-fetch-alesis-fw.yml"
+permissions:
+  contents: write
+jobs:
+  fetch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and validate firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p alesis-fw-staging
+          curl -L --fail --retry 3 -o /tmp/hr16b.bin https://burnkit2600.com/hr16/HR16_B_V2_00.BIN
+          curl -L --fail --retry 3 -o /tmp/sr16.bin https://burnkit2600.com/hr16/SR16_V1_04.BIN
+          python3 - <<'PY'
+          import zlib, pathlib, base64
+          specs=[
+            ('/tmp/hr16b.bin','alesis-fw-staging/HR16_B_V2_00.b64',0x19cf0fce,32768),
+            ('/tmp/sr16.bin','alesis-fw-staging/SR16_V1_04.b64',0xd049af6e,65536),
+          ]
+          for src,dst,crc,size in specs:
+              b=pathlib.Path(src).read_bytes()
+              got=zlib.crc32(b)&0xffffffff
+              print(src,len(b),hex(got))
+              if len(b)!=size or got!=crc:
+                  raise SystemExit(f'validation failed {src}: size={len(b)} crc={got:08x}')
+              pathlib.Path(dst).write_text(base64.b64encode(b).decode())
+          PY
+      - name: Commit validated firmware text
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add alesis-fw-staging/*.b64
+          git commit -m "Stage validated Alesis firmware for emulator migration"
+          git push
