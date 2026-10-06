@@ -1,0 +1,85 @@
+<style id="phase7-hardware-accuracy-style">
+#ph7Hardware{border-color:#5d5948;background:linear-gradient(180deg,#1b1b17,#11120f)}
+#ph7Hardware .ph7grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:8px}
+#ph7Hardware .ph7cell{font:800 9px ui-monospace,monospace;color:#cfd5d8}
+#ph7Hardware .ph7line{height:8px;background:#080a0b;border:1px solid #41484c;border-radius:4px;overflow:hidden}.ph7line i{display:block;height:100%;width:0;background:#b7c56e;transition:width .07s}
+#ph7Hardware .ph7status{font:700 10px/1.45 ui-monospace,monospace;background:#090b0c;border:1px solid #3e4549;border-radius:5px;padding:7px;margin-top:8px;color:#bfcbd0}
+#ph7Hardware .good{color:#a5e98b}.ph7badge{display:inline-block;border:1px solid #59636a;border-radius:999px;padding:2px 6px;margin:2px;font:800 9px ui-monospace,monospace}
+.p2mixrow.ph7mix{grid-template-columns:minmax(90px,1.15fr) auto auto minmax(112px,1fr) minmax(135px,1fr) minmax(112px,1fr) minmax(115px,1fr) minmax(210px,1.7fr);gap:7px;align-items:center}
+.p2mixrow.ph7mix label{min-width:0}.p2mixrow.ph7mix select{min-width:0;max-width:100%}.p2mixrow.ph7mix .ph6solo.on{background:#725b19;color:#fff}.p2mixrow.ph7mix .ph6mute.on{background:#7b312e;color:#fff}
+@media(max-width:1050px){.p2mixrow.ph7mix{grid-template-columns:repeat(4,minmax(0,1fr))}.p2mixrow.ph7mix .name{grid-column:1/-1}}
+@media(max-width:650px){#ph7Hardware .ph7grid{grid-template-columns:repeat(2,minmax(0,1fr))}.p2mixrow.ph7mix{grid-template-columns:repeat(2,minmax(0,1fr))}.ph7voice{grid-column:1/-1}}
+</style>
+<script id="phase7-hardware-accuracy">
+/* PHASE 7 — traced DM3AG packet semantics + hardware output topology. */
+function ph7FindBytes(hay,needle,start=0){outer:for(let i=start;i<=hay.length-needle.length;i++){for(let j=0;j<needle.length;j++)if(hay[i+j]!==needle[j])continue outer;return i}return-1}
+function ph7Ascii8(name){const out=new Uint8Array(8);for(let i=0;i<8;i++)out[i]=i<name.length?name.charCodeAt(i):32;return out}
+function ph7ParseSRDescriptors(){
+ const fw=PH3_FW_SR16,voices=PH6_MODELS.sr16.voices,loc=[];let pos=52000;
+ for(const v of voices){let at=ph7FindBytes(fw,ph7Ascii8(v.name),pos);if(at<0){const raw=Uint8Array.from([...v.name].map(c=>c.charCodeAt(0)));at=ph7FindBytes(fw,raw,pos)}if(at<0)throw new Error('SR-16 descriptor anchor missing: '+v.name);loc.push(at);pos=at+8}
+ const test=ph7FindBytes(fw,Uint8Array.from([...`TestTone`].map(c=>c.charCodeAt(0))),loc[loc.length-1]+8),out=[];
+ for(let k=0;k<voices.length;k++){const v=voices[k],at=loc[k],next=k+1<loc.length?loc[k+1]:test,flag=fw[at+8],start=at+9,span=next-start;let n=(span>=8&&span%8===0)?span/8:(flag&0x7f);n=Math.max(1,Math.min(12,n));const descriptors=[];for(let j=0;j<n;j++){const r=Array.from(fw.slice(start+j*8,start+(j+1)*8));if(r.length<8)break;descriptors.push({raw:r,ptr:((r[2]<<12)|(r[3]<<4))>>>0,tune:r[4]})}out.push({num:v.num,name:v.name,flag,descriptors})}
+ return out;
+}
+const PH7_SR_DESC=ph7ParseSRDescriptors();
+const ph7Slots=Array.from({length:16},()=>new Set());
+let ph7PendingDM=null,ph7BurstEvent=null,ph7BurstUntil=0,ph7EventSeq=0,ph7Graph=null;
+const ph7Trace={packets:0,starts:0,stops:0,last:null,srDescriptors:PH7_SR_DESC.length};
+function ph7Clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+function ph7DMTuneRate(raw,extra=0){return Math.pow(2,((raw&255)-0x10+(+extra||0))/12)}
+function ph7DMAttenuation(raw){return ph7Clamp((248-ph7Clamp(raw||0,0,248))/248,0,1)}
+function ph7PanGains(code){const p=ph7Clamp(code|0,0,6)/6;return [1-p,p]} // hardware-style stepped L/R sends
+function ph7StopSlot(slot){slot&=15;for(const src of [...ph7Slots[slot]]){try{src.stop()}catch(_){}try{src.disconnect()}catch(_){}ph6Sources.delete(src);ph7Slots[slot].delete(src)}ph7Trace.stops++}
+function ph7StopAllSlots(){for(let i=0;i<16;i++)ph7StopSlot(i)}
+function ph7EnsureGraph(){
+ if(!audioCtx)return null;if(ph7Graph&&ph7Graph.ctx===audioCtx)return ph7Graph;
+ const ctx=audioCtx,mk=()=>{const input=ctx.createGain(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();filter.type='lowpass';filter.frequency.value=ph6Analog?17500:Math.min(22000,ctx.sampleRate*.49);filter.Q.value=.707;gain.gain.value=1.045;input.connect(filter);filter.connect(gain);return{input,filter,gain}};
+ const ch=[mk(),mk(),mk(),mk()];let merger,left=null,right=null,four=false;
+ try{four=(ctx.destination.maxChannelCount||2)>=4;if(four){ctx.destination.channelCount=4;ctx.destination.channelCountMode='explicit';merger=ctx.createChannelMerger(4);ch.forEach((x,i)=>x.gain.connect(merger,0,i));merger.connect(ctx.destination)}}catch(_){four=false}
+ if(!four){merger=ctx.createChannelMerger(2);left=ctx.createGain();right=ctx.createGain();ch[0].gain.connect(left);ch[2].gain.connect(left);ch[1].gain.connect(right);ch[3].gain.connect(right);left.connect(merger,0,0);right.connect(merger,0,1);merger.connect(ctx.destination)}
+ ph7Graph={ctx,ch,merger,left,right,fourChannel:four};const st=document.getElementById('ph7Status');if(st)st.textContent=`READY • 4-way hardware routing • ${four?'4-CHANNEL DEVICE OUTPUT':'STEREO FOLD-DOWN'} • OUT1 master-volume path / OUT2 aux path`;ph7UpdateOutputGraph();return ph7Graph;
+}
+function ph7UpdateOutputGraph(){if(!ph7Graph)return;const hz=ph6Analog?17500:Math.min(22000,audioCtx.sampleRate*.49);ph7Graph.ch.forEach(x=>x.filter.frequency.value=hz);const m=ph7Clamp(p2Master,0,1.25)*ph7Clamp(ph6Bus[0],0,1.25),a=ph7Clamp(ph6Bus[1],0,1.25);ph7Graph.ch[0].gain.gain.value=1.045*m;ph7Graph.ch[1].gain.gain.value=1.045*m;ph7Graph.ch[2].gain.gain.value=1.045*a;ph7Graph.ch[3].gain.gain.value=1.045*a}
+function ph7Meter(bus,pan,amount){const [l,r]=ph7PanGains(pan),vals=bus===2?[0,0,l*amount,r*amount]:[l*amount,r*amount,0,0];['ph7M1L','ph7M1R','ph7M2L','ph7M2R'].forEach((id,i)=>{const e=document.getElementById(id);if(!e)return;e.style.width=ph7Clamp(vals[i]*100,2,100)+'%';clearTimeout(e._t);e._t=setTimeout(()=>e.style.width='0%',110)})}
+function ph7Source(ptr,opt={}){
+ if(!audioCtx) return null;const pcm=decodeVoice(ptr>>>0);if(!pcm||!pcm.length)return null;const gph=ph7EnsureGraph();if(!gph)return null;
+ const b=audioCtx.createBuffer(1,pcm.length,48000);b.copyToChannel(pcm,0);const src=audioCtx.createBufferSource(),amp=audioCtx.createGain(),lg=audioCtx.createGain(),rg=audioCtx.createGain();src.buffer=b;src.playbackRate.value=ph7Clamp(ph7DMTuneRate(opt.tune??0x10,opt.extraTune||0),.125,8);amp.gain.value=ph7Clamp(opt.gain??1,0,1.4);const [L,R]=ph7PanGains(opt.pan??3);lg.gain.value=L;rg.gain.value=R;src.connect(amp);amp.connect(lg);amp.connect(rg);const bus=opt.bus===2?2:1;lg.connect(gph.ch[bus===1?0:2].input);rg.connect(gph.ch[bus===1?1:3].input);const slot=(opt.slot??0)&15;ph7StopSlot(slot);ph7Slots[slot].add(src);ph6Sources.add(src);src.onended=()=>{ph7Slots[slot].delete(src);ph6Sources.delete(src)};src.start(0);ph7Trace.starts++;ph7Meter(bus,opt.pan??3,opt.gain??1);return src;
+}
+function ph7ResolveEvent(){const now=performance.now();if(ph7BurstEvent&&now<=ph7BurstUntil)return ph7BurstEvent;while(p2PadQueue.length&&now-p2PadQueue[0].t>650)p2PadQueue.shift();const ev=p2PadQueue.shift()||null;if(ev){ev._ph7id=++ph7EventSeq;ph7BurstEvent=ev;ph7BurstUntil=now+(ph6MachineKey()==='sr16'?32:14)}else{ph7BurstEvent=null;ph7BurstUntil=0}return ev}
+function ph7SRVoiceEntry(cfg){if(ph6MachineKey()!=='sr16'||!cfg)return null;const idx=cfg.voiceOverride?.sr16;if(idx==null||idx==='')return null;return PH7_SR_DESC[+idx]||null}
+function ph7PlaySRProgram(entry,cfg,ev,dm){
+ const ds=entry?.descriptors||[];if(!ds.length)return false;const prim=ds.filter(d=>(d.raw?.[5]||0)===0),fx=ds.filter(d=>(d.raw?.[5]||0)!==0);let chosen=[];
+ if(prim.length){let i;if(entry.flag&0x80)i=Math.floor(Math.random()*prim.length);else i=Math.min(prim.length-1,Math.floor(ph7Clamp((ev?.velocity||110)/128,0,.999)*prim.length));chosen.push(prim[i])}chosen.push(...fx);
+ chosen.forEach((d,i)=>{let pan=(cfg.ph7PanCode==null?dm.pan:cfg.ph7PanCode),bus=(cfg.ph7Bus==null?dm.out:cfg.ph7Bus);const side=d.raw?.[5]||0;if(side&&side%16===8)pan=0;else if(side&&side%16===0)pan=6;const vel=ph6Vel(ev?.velocity||110),wet=i?0.62:1,g=ph7DMAttenuation(dm.vol)*(cfg.level??1)*vel*wet;ph7Source(d.ptr,{tune:d.tune,extraTune:cfg.tune||0,gain:g,pan,bus,slot:(dm.slot+i)&15})});return true;
+}
+/* Packet byte tracing established: bytes 0-1 are the ROM address in 16-byte units; byte 2 is the full tune byte; byte 3 is attenuation; byte 4 = pan[7:5], OUT[4], voice slot[3:0]. */
+dmWrite=function(v){
+ dmBytes.push(v&255);if(dmBytes.length<5)return;const c=dmBytes.splice(0,5),ptr=((c[0]<<12)|(c[1]<<4))>>>0,tune=c[2]&255,atten=c[3]&255,pan=(c[4]>>5)&7,out=(c[4]&0x10)?1:2,slot=c[4]&15,isStop=(c[0]===0&&c[1]===0&&tune===0&&atten>=240);
+ lastCmd={c,ptr,tune,low:tune&15,tuneHi:(tune>>4)&15,vol:atten,attenuation:atten,pan,out,slot,isStop};cmdCount++;ph7Trace.packets++;ph7Trace.last=lastCmd;
+ if(isStop)ph7StopSlot(slot);else{ph7PendingDM=lastCmd;playDM(ptr,lastCmd);ph7PendingDM=null}updateDebug();
+};
+updateDebug=function(){if(!cpu)return;const pc=cpu.pc.toString(16).padStart(4,'0').toUpperCase();let d=`PC $${pc}   machine cycles ${cpu.cycles.toLocaleString()}   DM3AG packets ${cmdCount}`;if(lastCmd)d+=`\nDM3AG ${lastCmd.c.map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' ')} → ROM $${lastCmd.ptr.toString(16).padStart(5,'0').toUpperCase()}  tune=$${lastCmd.tune.toString(16).padStart(2,'0')} atten=$${lastCmd.vol.toString(16).padStart(2,'0')} pan=${lastCmd.pan} out=${lastCmd.out} slot=${lastCmd.slot}${lastCmd.isStop?' STOP':''}`;$('debug').textContent=d};
+playDM=function(ptr,dmArg){
+ if(!audioCtx||!audioUnlocked)ph4PrimeContext();if(!audioCtx)return;const dm=dmArg||ph7PendingDM||lastCmd;if(!dm)return;const ev=ph7ResolveEvent(),name=ev?.name,cfg=name?p2Mix[name]:null;if(name&&!ph6Audible(name)){ph7StopSlot(dm.slot);return}
+ const sr=ph7SRVoiceEntry(cfg);if(sr&&ev){if(ev._ph7OverrideDone)return;ev._ph7OverrideDone=true;if(ph7PlaySRProgram(sr,cfg,ev,dm))return}
+ let usePtr=ptr;if(name&&ph6MachineKey()!=='sr16')usePtr=ph6VoiceFor(name,ptr);const pan=cfg?.ph7PanCode==null?dm.pan:cfg.ph7PanCode,bus=cfg?.ph7Bus==null?dm.out:cfg.ph7Bus,vel=ev?ph6Vel(ev.velocity||110):1,g=ph7DMAttenuation(dm.vol)*(cfg?.level??1)*vel;ph7Source(usePtr,{tune:dm.tune,extraTune:cfg?.tune||0,gain:g,pan,bus,slot:dm.slot});ph4AudioStats.starts++;ph4AudioStats.lastPtr=usePtr;ph4AudioStats.lastSamples=decodeVoice(usePtr).length;ph4AudioStats.lastMachine=ph6MachineKey();ph4SetAudioUI(audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / REAL ROM',true);
+};
+/* Phase-7 mixer defaults to firmware panning and output assignment. Manual changes remain available. */
+function ph7InitMix(){ph6InitMix();for(const n of P2_PADS){const c=p2Mix[n];if(!Object.prototype.hasOwnProperty.call(c,'ph7PanCode'))c.ph7PanCode=null;if(!Object.prototype.hasOwnProperty.call(c,'ph7Bus'))c.ph7Bus=null}}
+function ph7VoiceOptions(sel,name){const key=ph6MachineKey(),cfg=p2Mix[name],cur=cfg.voiceOverride?.[key];sel.innerHTML='<option value="">FIRMWARE VOICE</option>';ph6Voices().forEach((v,i)=>{const o=document.createElement('option');o.value=i;let extra='';if(key==='sr16'){const e=PH7_SR_DESC[i],n=e?.descriptors?.length||1;extra=` • ${n}D${e?.flag&0x80?' RND':''}`}o.textContent=`${String(v.num??i+1).padStart(3,'0')} • ${v.name||('VOICE '+(i+1))}${extra}`;sel.appendChild(o)});sel.value=cur==null?'':String(cur)}
+p2BuildMixer=function(){ph7InitMix();const h=document.getElementById('p2Mixer');if(!h)return;h.innerHTML='';for(const n of P2_PADS){const c=p2Mix[n],r=document.createElement('div');r.className='p2mixrow ph7mix';r.innerHTML=`<div class="name">${n}</div>`;const mute=document.createElement('button');mute.className='ph6mute';mute.textContent='MUTE';mute.classList.toggle('on',!!c.mute);mute.onclick=()=>{c.mute=!c.mute;mute.classList.toggle('on',c.mute)};r.appendChild(mute);const solo=document.createElement('button');solo.className='ph6solo';solo.textContent='SOLO';solo.classList.toggle('on',!!c.solo);solo.onclick=()=>{c.solo=!c.solo;solo.classList.toggle('on',c.solo)};r.appendChild(solo);
+ function range(label,min,max,val,fn){const l=document.createElement('label');l.innerHTML='<span>'+label+'</span>';const x=document.createElement('input');x.type='range';x.min=min;x.max=max;x.value=val;const b=document.createElement('b');b.textContent=val;x.oninput=()=>{fn(+x.value);b.textContent=x.value};l.append(x,b);return l}
+ r.appendChild(range('LEVEL',0,100,Math.round((c.level??1)*100),v=>c.level=v/100));
+ const pan=document.createElement('select');pan.innerHTML='<option value="">PAN: FIRMWARE</option><option value="0">PAN: L3</option><option value="1">PAN: L2</option><option value="2">PAN: L1</option><option value="3">PAN: CENTER</option><option value="4">PAN: R1</option><option value="5">PAN: R2</option><option value="6">PAN: R3</option>';pan.value=c.ph7PanCode==null?'':String(c.ph7PanCode);pan.onchange=()=>c.ph7PanCode=pan.value===''?null:+pan.value;r.appendChild(pan);
+ r.appendChild(range('TUNE',-16,15,+c.tune||0,v=>c.tune=v));
+ const bus=document.createElement('select');bus.innerHTML='<option value="">OUTPUT: FIRMWARE</option><option value="1">OUTPUT: OUT 1</option><option value="2">OUTPUT: OUT 2/AUX</option>';bus.value=c.ph7Bus==null?'':String(c.ph7Bus);bus.onchange=()=>c.ph7Bus=bus.value===''?null:+bus.value;r.appendChild(bus);
+ const voice=document.createElement('select');voice.className='ph7voice';ph7VoiceOptions(voice,n);voice.onchange=()=>{if(!c.voiceOverride)c.voiceOverride={};c.voiceOverride[ph6MachineKey()]=voice.value===''?null:+voice.value};r.appendChild(voice);h.appendChild(r)}};
+function ph7Install(){
+ ph7InitMix();const old=document.getElementById('ph6Advanced');if(old){const sub=old.querySelector('.p2sub');if(sub)sub.textContent='Phase 7 defaults to firmware pan/output/tune/attenuation. Studio overrides are applied only when explicitly selected.';const f=document.getElementById('ph6Filter');if(f)f.onchange=e=>{ph6Analog=e.target.checked;ph7UpdateOutputGraph()};const b1=document.getElementById('ph6Bus1'),b2=document.getElementById('ph6Bus2');if(b1)b1.oninput=e=>{ph6Bus[0]=+e.target.value/100;ph7UpdateOutputGraph()};if(b2)b2.oninput=e=>{ph6Bus[1]=+e.target.value/100;ph7UpdateOutputGraph()}}
+ const mix=document.getElementById('p2Mixer')?.closest('.p2panel');if(mix&&!document.getElementById('ph7Hardware')){const d=document.createElement('div');d.className='p2panel';d.id='ph7Hardware';d.innerHTML=`<h3>Phase 7 • DM3AG / Hardware Accuracy</h3><div><span class="ph7badge">20-BIT ROM ADDRESS FIXED</span><span class="ph7badge">FULL TUNE BYTE</span><span class="ph7badge">16 ASIC VOICE SLOTS</span><span class="ph7badge">4052 4-WAY ROUTING</span><span class="ph7badge">SR-16 ${PH7_SR_DESC.length} VOICES PARSED</span></div><div class="ph7grid"><div class="ph7cell">OUT1 L<div class="ph7line"><i id="ph7M1L"></i></div></div><div class="ph7cell">OUT1 R<div class="ph7line"><i id="ph7M1R"></i></div></div><div class="ph7cell">OUT2 L<div class="ph7line"><i id="ph7M2L"></i></div></div><div class="ph7cell">OUT2 R<div class="ph7line"><i id="ph7M2R"></i></div></div></div><div id="ph7Status" class="ph7status good">READY • bytes 0-1 address • byte 2 tune • byte 3 attenuation • byte 4 pan / output / voice-slot</div>`;mix.parentNode.insertBefore(d,mix)}
+ const master=document.getElementById('p2Master');if(master)master.addEventListener('input',()=>setTimeout(ph7UpdateOutputGraph,0));p2BuildMixer();
+}
+const ph7OldStopAll=ph6StopAll;ph6StopAll=function(){ph7StopAllSlots();try{ph7OldStopAll()}catch(_){}};
+const ph7Switch=ph3SwitchMachine;ph3SwitchMachine=function(key){ph7StopAllSlots();ph7BurstEvent=null;const r=ph7Switch.apply(this,arguments);setTimeout(()=>{p2BuildMixer();const s=document.getElementById('ph7Status');if(s)s.textContent=`READY • ${activeCfg.name} • corrected DM3AG address/tune/attenuation/pan/output/slot decode`},30);return r};
+(function(){ph7Install();const old=p2UpdateDiag;p2UpdateDiag=function(){old&&old();const d=document.getElementById('p2Diag');if(d)d.textContent+=` • P7 addr=t0/t1<<4 • tune8 • slots16 • SRdesc ${PH7_SR_DESC.length}`};})();
+</script>
