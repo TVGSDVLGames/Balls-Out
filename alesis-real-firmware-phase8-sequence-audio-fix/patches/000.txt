@@ -1,0 +1,116 @@
+<style id="phase8-sequence-audio-fix-style">
+#ph8SeqStatus{margin-top:7px;font:700 10px/1.45 ui-monospace,monospace;color:#c9d7dc;background:#090b0c;border:1px solid #3d474c;border-radius:5px;padding:7px}
+#ph8SeqStatus.good{color:#a8e990}
+</style>
+<script id="phase8-sequence-audio-fix">
+/* PHASE 8 — sequencer reliability/audio regression fix.
+   - Keeps the validated Phase-7 DM3AG sample-address/tune framing.
+   - Source starts no longer hard-steal unrelated sounds just because byte-4 low nibbles match.
+   - Pattern Studio triggers are serialized through the real firmware scanner to prevent matrix ghosting.
+   - Swing 0 is explicitly exact straight 16ths. */
+const ph8Stats={seqHits:0,seqPackets:0,retries:0,misses:0,ghostSafeBatches:0};
+let ph8SeqId=0,ph8SourceStarting=false,ph8HatEvent=-1;
+const ph8HatSources=new Set();
+
+/* DM3AG framing validated against the ROM voice table: Phase 7 framing is retained.
+   Bytes 0-1 form the sample pointer in 16-byte units; byte 2 is the full firmware tune value (0x10 nominal). */
+
+/* Byte-4 low nibble is not safe to treat as an exclusive software voice slot: e.g. kick and hats can share it.
+   Preserve explicit firmware STOP handling, but suppress the automatic stop performed on every source start. */
+const ph8RealStopSlot=ph7StopSlot;
+ph7StopSlot=function(slot){if(ph8SourceStarting)return;return ph8RealStopSlot(slot)};
+const ph8BaseSource=ph7Source;
+ph7Source=function(ptr,opt={}){
+  const ev=ph7BurstEvent,name=ev?.name||'',eid=ev?._ph7id||ev?._p8id||0,isHat=name.includes('HAT');
+  if(isHat&&eid!==ph8HatEvent){
+    for(const s of [...ph8HatSources]){try{s.stop()}catch(_){}try{s.disconnect()}catch(_){}ph8HatSources.delete(s);ph6Sources.delete(s)}
+    ph8HatEvent=eid;
+  }
+  ph8SourceStarting=true;let src=null;
+  try{src=ph8BaseSource(ptr,opt)}finally{ph8SourceStarting=false}
+  if(isHat&&src){ph8HatSources.add(src);try{src.addEventListener('ended',()=>ph8HatSources.delete(src),{once:true})}catch(_){}}
+  return src;
+};
+
+/* Same Phase-7 routing/override behavior, but muting a new event must not kill an unrelated already-ringing sound. */
+playDM=function(ptr,dmArg){
+  if(!audioCtx||!audioUnlocked)ph4PrimeContext();if(!audioCtx)return;
+  const dm=dmArg||ph7PendingDM||lastCmd;if(!dm)return;
+  const ev=ph7ResolveEvent(),name=ev?.name,cfg=name?p2Mix[name]:null;
+  if(name&&!ph6Audible(name))return;
+  const sr=ph7SRVoiceEntry(cfg);
+  if(sr&&ev){if(ev._ph7OverrideDone)return;ev._ph7OverrideDone=true;if(ph7PlaySRProgram(sr,cfg,ev,dm))return}
+  let usePtr=ptr;if(name&&ph6MachineKey()!=='sr16')usePtr=ph6VoiceFor(name,ptr);
+  const pan=cfg?.ph7PanCode==null?dm.pan:cfg.ph7PanCode,bus=cfg?.ph7Bus==null?dm.out:cfg.ph7Bus,vel=ev?ph6Vel(ev.velocity||110):1,g=ph7DMAttenuation(dm.vol)*(cfg?.level??1)*vel;
+  ph7Source(usePtr,{tune:dm.tune,extraTune:cfg?.tune||0,gain:g,pan,bus,slot:dm.slot});
+  ph4AudioStats.starts++;ph4AudioStats.lastPtr=usePtr;ph4AudioStats.lastSamples=decodeVoice(usePtr).length;ph4AudioStats.lastMachine=ph6MachineKey();
+  ph4SetAudioUI(audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / REAL ROM',true);
+};
+
+function ph8AdvanceCycles(n){
+  if(!cpu||n<=0)return 0;const st=cpu.cycles;runCycles(n);const adv=cpu.cycles-st;
+  if(Number.isFinite(cycleDebt))cycleDebt=Math.max(-120000,cycleDebt-adv);
+  return adv;
+}
+function ph8QueueSeq(name,velocity){
+  const ev={name,velocity,t:performance.now(),_p8seq:true,_p8id:++ph8SeqId};
+  p2PadQueue.push(ev);if(p2PadQueue.length>64)p2PadQueue.shift();return ev;
+}
+function ph8RemoveQueued(ev){const i=p2PadQueue.indexOf(ev);if(i>=0)p2PadQueue.splice(i,1)}
+function ph8FirmwareSeqHit(name,velocity=110){
+  if(!ph6Audible(name))return true;const q=p2Coord(name);if(!q||!cpu)return false;const[c,b]=q,mask=1<<b;
+  for(let attempt=0;attempt<2;attempt++){
+    columns[c]|=mask;ph7BurstEvent=null;ph7BurstUntil=0;
+    const ev=ph8QueueSeq(name,velocity),before=cmdCount;let got=false,quiet=0,last=cmdCount,guard=0;
+    columns[c]&=~mask;
+    while(guard++<60){
+      ph8AdvanceCycles(1000);
+      if(cmdCount!==last){got=true;last=cmdCount;quiet=0}else if(got)quiet+=1000;
+      if(got&&quiet>=2000)break;
+    }
+    columns[c]|=mask;
+    ph7BurstEvent=null;ph7BurstUntil=0;
+    ph8RemoveQueued(ev);
+    if(got){ph8Stats.seqHits++;ph8Stats.seqPackets+=cmdCount-before;return true}
+    ph8Stats.retries++;ph8AdvanceCycles(ph6MachineKey()==='sr16'?80000:26000);
+  }
+  ph8Stats.misses++;return false;
+}
+function ph8FirmwareSeqBatch(hits,intervalMs){
+  if(!hits.length)return;
+  /* Never hold multiple simulated physical pads down together. That produced corrupted DM3AG addresses. */
+  for(const h of hits)ph8FirmwareSeqHit(h.name,h.velocity);
+  const need=ph6MachineKey()==='sr16'?80:26,topup=Math.max(0,need-Math.max(0,+intervalMs||0));
+  if(topup>0)ph8AdvanceCycles(Math.ceil(topup*1000));
+  ph8Stats.ghostSafeBatches++;
+}
+
+/* Exact straight timing at zero. Nonzero swing keeps each two-step pair the same total duration. */
+p2StepDur=function(step){
+  const bpm=Math.max(20,+document.getElementById('p2Bpm').value||120),sw=Math.max(0,Math.min(100,+document.getElementById('p2Swing').value||0)),base=60000/bpm/4;
+  if(sw===0)return base;
+  const delta=base*.5*(sw/100);return(step&1)?base-delta:base+delta;
+};
+
+/* Pattern Studio now serializes each same-step hit through firmware. Manual drum-pad behavior is untouched. */
+p2Fire=function(step,dur,gen){
+  if(!p2Playing||gen!==p2Generation)return;
+  const hits=[];
+  for(const n of P2_PADS){
+    const cell=p2Pattern[n][step];if(!cell)continue;
+    const velocity=cell===2?127:110;hits.push({name:n,velocity});
+    const r=Math.max(1,+(p2Ratchets[n][step]||1));
+    if(r>1){for(let j=1;j<r;j++){const sub=dur/r;setTimeout(()=>{if(p2Playing&&gen===p2Generation)ph8FirmwareSeqBatch([{name:n,velocity}],sub)},sub*j)}}
+  }
+  ph8FirmwareSeqBatch(hits,dur);
+  document.querySelectorAll('.p2step.playhead').forEach(e=>e.classList.remove('playhead'));
+  document.querySelectorAll(`.p2step[data-step="${step}"]`).forEach(e=>e.classList.add('playhead'));
+};
+
+(function ph8Install(){
+  const sw=document.getElementById('p2Swing'),sv=document.getElementById('p2SwingV');
+  if(sw){sw.min='0';sw.max='100';sw.step='1';const upd=()=>{let v=Math.max(0,Math.min(100,Math.round(+sw.value||0)));if(v<=0)v=0;sw.value=String(v);if(sv)sv.textContent=v===0?'0% • STRAIGHT':v+'%'};sw.addEventListener('input',upd);sw.addEventListener('change',upd);upd()}
+  const hw=document.getElementById('ph7Hardware');if(hw&&!document.getElementById('ph8SeqStatus')){const d=document.createElement('div');d.id='ph8SeqStatus';d.className='good';d.textContent='PHASE 8 • sequence bridge armed • same-step pads serialized through real firmware • swing 0 = exact straight 16ths';hw.appendChild(d)}
+  const old=p2UpdateDiag;p2UpdateDiag=function(){old&&old();const d=document.getElementById('p2Diag');if(d)d.textContent+=` • P8 seq ${ph8Stats.seqHits} • retry ${ph8Stats.retries} • miss ${ph8Stats.misses} • swing0 exact`};
+})();
+</script>
