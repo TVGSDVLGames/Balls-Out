@@ -1,0 +1,19 @@
+<style id="phase2-audiofix-style">#p2AudioStartFix{font-weight:900;background:#173d28;color:#d9ffe9;border:1px solid #4e9c6d;border-radius:6px;padding:8px 12px;cursor:pointer}</style>
+<script id="phase2-audiofix">
+const p2AudioFixStats={starts:0,lastSamples:0,lastPtr:0,misses:0};
+function p2AudioPrime(){
+ try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+ if(navigator.audioSession&&'type' in navigator.audioSession){try{navigator.audioSession.type='playback'}catch(_){}}
+ if(!audioCtx||audioCtx.state==='closed')audioCtx=new AC({latencyHint:'interactive'});
+ if(audioCtx.state!=='running'){try{audioCtx.resume()}catch(_){}}
+ try{const b=audioCtx.createBuffer(1,128,audioCtx.sampleRate||48000),s=audioCtx.createBufferSource(),g=audioCtx.createGain();s.buffer=b;g.gain.value=.00001;s.connect(g);g.connect(audioCtx.destination);s.start(0)}catch(_){}
+ audioUnlocked=true;const a=document.getElementById('audStat');if(a){a.textContent=audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / REAL ROM';a.className='good'}return true;
+ }catch(e){console.error(e);return false}
+}
+unlockAudio=p2AudioPrime;
+playDM=function(ptr){if(ptr<=0)return;if(!audioCtx||!audioUnlocked)p2AudioPrime();if(!audioCtx)return;const pcm=decodeVoice(ptr);if(!pcm.length){p2AudioFixStats.misses++;return}while(p2PadQueue.length&&performance.now()-p2PadQueue[0].t>400)p2PadQueue.shift();const ev=p2PadQueue.shift(),cfg=ev?p2Mix[ev.name]:null;const b=audioCtx.createBuffer(1,pcm.length,48000);b.copyToChannel(pcm,0);const s=audioCtx.createBufferSource(),g=audioCtx.createGain();s.buffer=b;g.gain.value=Math.max(0,Math.min(1.2,.92*p2Master*(cfg?cfg.level:1)));s.connect(g);if(audioCtx.createStereoPanner){const pan=audioCtx.createStereoPanner();pan.pan.value=cfg?Math.max(-1,Math.min(1,cfg.pan)):0;g.connect(pan);pan.connect(audioCtx.destination)}else g.connect(audioCtx.destination);s.start(0);p2AudioFixStats.starts++;p2AudioFixStats.lastSamples=pcm.length;p2AudioFixStats.lastPtr=ptr};
+p2Pulse=function(name,hold=18){const mix=p2Mix[name];if(mix?.mute)return;const q=p2Coord(name);if(!q)return;p2QueuePad(name);const[c,b]=q;columns[c]&=~(1<<b);setTimeout(()=>{columns[c]|=(1<<b)},Math.max(24,hold||0))};
+const p2AudioOldPlay=p2Play;p2Play=function(){p2AudioPrime();return p2AudioOldPlay.apply(this,arguments)};
+(function(){const box=document.querySelector('.sliderbox');if(box){const b=document.createElement('button');b.id='p2AudioStartFix';b.textContent='START AUDIO';const f=e=>{try{e&&e.preventDefault()}catch(_){}p2AudioPrime()};b.addEventListener('touchstart',f,{passive:false});b.addEventListener('pointerdown',f,{passive:false});b.addEventListener('click',f,{passive:false});box.appendChild(b)}document.querySelectorAll('#pads button,#controls button,#p2Play,[data-fwshortcut]').forEach(el=>{el.addEventListener('pointerdown',p2AudioPrime,{passive:true});el.addEventListener('touchstart',p2AudioPrime,{passive:true})})})();
+</script>
+
