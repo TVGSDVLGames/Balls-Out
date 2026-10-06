@@ -1,0 +1,164 @@
+<style id="phase4-audio-parity-style">
+#ph4AudioStart{font-weight:900;background:#173d28;color:#d9ffe9;border:1px solid #4e9c6d;border-radius:6px;padding:8px 12px;cursor:pointer}
+#ph4AudioStart.warn{background:#4a3515;color:#fff0c2;border-color:#b88734}
+#ph4AudioStart.good{background:#173d28;color:#d9ffe9;border-color:#4e9c6d}
+#ph4AudioNote{margin-top:8px;font:700 11px/1.35 ui-monospace,monospace;color:#d9e5ea}
+</style>
+<script id="phase4-audio-parity-fix">
+/* PHASE 4 — audio reliability + firmware sequencer parity.
+   Keeps ROM decoding and DM3AG command generation firmware-driven. */
+const ph4AudioStats={starts:0,lastPtr:0,lastSamples:0,lastMachine:'',misses:0};
+const ph4AudioSources=new Set();
+let ph4CtxStamp=null;
+function ph4SetAudioUI(msg,good=true){
+  const st=document.getElementById('audStat'); if(st){st.textContent=msg;st.className=good?'good':'warn'}
+  const b=document.getElementById('ph4AudioStart'); if(b){b.textContent=good?'AUDIO ACTIVE':'START AUDIO';b.className=good?'good':'warn'}
+}
+function ph4PrimeContext(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC){ph4SetAudioUI('WEB AUDIO UNAVAILABLE',false);return false}
+    if(navigator.audioSession&&'type' in navigator.audioSession){try{navigator.audioSession.type='playback'}catch(_){}}
+    if(!audioCtx||audioCtx.state==='closed') audioCtx=new AC({latencyHint:'interactive'});
+    if(ph4CtxStamp!==audioCtx){ ph4CtxStamp=audioCtx; }
+    if(audioCtx.state!=='running'){try{audioCtx.resume()}catch(_){}}
+    try{
+      const b=audioCtx.createBuffer(1,128,audioCtx.sampleRate||48000),src=audioCtx.createBufferSource(),g=audioCtx.createGain();
+      src.buffer=b;g.gain.value=.00001;src.connect(g);g.connect(audioCtx.destination);src.start(0);
+    }catch(_){}
+    audioUnlocked=true; ph4SetAudioUI(audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / TAP PAD',true); return true;
+  }catch(e){console.error('phase4 audio unlock',e);ph4SetAudioUI('AUDIO START FAILED',false);return false}
+}
+unlockAudio=ph4PrimeContext;
+
+/* Firmware DM3AG -> original sound ROM PCM. Mixer applies only to Pattern Studio hits. */
+playDM=function(ptr){
+  if(ptr<=0)return;
+  if(!audioCtx||!audioUnlocked) ph4PrimeContext();
+  if(!audioCtx)return;
+  const pcm=decodeVoice(ptr); if(!pcm||!pcm.length){ph4AudioStats.misses++;return}
+  while(p2PadQueue.length&&performance.now()-p2PadQueue[0].t>400)p2PadQueue.shift();
+  const ev=p2PadQueue.shift(),cfg=ev?p2Mix[ev.name]:null;
+  try{
+    const b=audioCtx.createBuffer(1,pcm.length,48000); b.copyToChannel(pcm,0);
+    const src=audioCtx.createBufferSource(),gain=audioCtx.createGain(); src.buffer=b;
+    gain.gain.value=Math.max(0,Math.min(1.2,.92*p2Master*(cfg?cfg.level:1)));
+    src.connect(gain);
+    if(audioCtx.createStereoPanner){
+      const pan=audioCtx.createStereoPanner(); pan.pan.value=cfg?Math.max(-1,Math.min(1,cfg.pan)):0;
+      gain.connect(pan); pan.connect(audioCtx.destination);
+    }else gain.connect(audioCtx.destination);
+    src.onended=()=>ph4AudioSources.delete(src);ph4AudioSources.add(src);src.start(0);
+    ph4AudioStats.starts++;ph4AudioStats.lastPtr=ptr;ph4AudioStats.lastSamples=pcm.length;ph4AudioStats.lastMachine=(typeof activeMachine!=='undefined'?activeMachine:'hr16');
+    ph4SetAudioUI(audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / REAL ROM',true);
+  }catch(e){console.error('phase4 DM playback',e);ph4SetAudioUI('PLAYBACK ERROR',false)}
+};
+
+/* Real SR-16 firmware scans the key matrix more slowly than HR-16/HR-16B.
+   The old 18 ms sequencer pulse was routinely missed. */
+p2Pulse=function(name,hold=18){
+  const mix=p2Mix[name];if(mix?.mute)return;
+  const q=p2Coord(name);if(!q)return;
+  p2QueuePad(name);
+  const[c,b]=q;
+  const minimum=(typeof activeMachine!=='undefined'&&activeMachine==='sr16')?85:24;
+  const effective=Math.max(minimum,hold||0);
+  columns[c]&=~(1<<b);
+  setTimeout(()=>{columns[c]|=(1<<b)},effective);
+};
+
+/* Make PLAY itself a reliable audio gesture on iPhone/iPad and desktop. */
+const ph4OldPlay=p2Play,ph4OldStop=p2Stop;
+let ph4PendingPlay=0,ph4ResumeStep=null;
+p2Play=function(){
+  ph4PrimeContext();
+  if(typeof activeMachine!=='undefined'&&activeMachine==='sr16'&&cpu&&cpu.cycles<2550000){
+    if(ph4PendingPlay)return;
+    const wait=Math.max(120,Math.min(2600,Math.ceil((2550000-cpu.cycles)/1000)+140));
+    const st=document.getElementById('p2PatternStatus');if(st)st.textContent=`SR-16 REAL FIRMWARE BOOTING • PATTERN STARTS IN ${(wait/1000).toFixed(1)}s`;
+    ph4PendingPlay=setTimeout(()=>{ph4PendingPlay=0;p2Play()},wait);
+    return;
+  }
+  const out=ph4OldPlay.apply(this,arguments);
+  if(p2Playing&&ph4ResumeStep!=null){p2Step=((ph4ResumeStep%p2Length)+p2Length)%p2Length;ph4ResumeStep=null}
+  return out;
+};
+p2Stop=function(){if(ph4PendingPlay){clearTimeout(ph4PendingPlay);ph4PendingPlay=0}return ph4OldStop.apply(this,arguments)};
+
+/* Audio button + diagnostics without removing any Phase-3 features. */
+(function ph4Install(){
+  const box=document.querySelector('.sliderbox');
+  if(box&&!document.getElementById('ph4AudioStart')){
+    const b=document.createElement('button');b.id='ph4AudioStart';b.className='warn';b.textContent='START AUDIO';
+    const start=e=>{try{e&&e.preventDefault()}catch(_){}ph4PrimeContext()};
+    b.addEventListener('touchstart',start,{passive:false});b.addEventListener('pointerdown',start,{passive:false});b.addEventListener('click',start,{passive:false});box.appendChild(b);
+  }
+  const settings=document.querySelector('[data-p2view="settings"] .p2panel');
+  if(settings&&!document.getElementById('ph4AudioNote')){
+    const d=document.createElement('div');d.id='ph4AudioNote';d.textContent='Audio fix: ROM PCM + real firmware DM3AG; SR-16 sequencer uses firmware-safe key holds.';settings.appendChild(d);
+  }
+  const oldDiag=p2UpdateDiag;
+  p2UpdateDiag=function(){
+    if(oldDiag)oldDiag();
+    const d=document.getElementById('p2Diag');if(d){d.textContent+=` • Audio ${audioCtx?.state||'locked'} • ROM starts ${ph4AudioStats.starts} • last ${ph4AudioStats.lastSamples||0} samples`}
+  };
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&audioCtx&&audioCtx.state!=='running')ph4SetAudioUI('TAP START AUDIO',false)},true);
+  window.addEventListener('pageshow',()=>{if(!audioCtx||audioCtx.state!=='running')ph4SetAudioUI('TAP START AUDIO',false)},true);
+  document.querySelectorAll('#pads button,#controls button,#p2Play,[data-fwshortcut]').forEach(el=>{
+    el.addEventListener('pointerdown',()=>ph4PrimeContext(),{passive:true});
+    el.addEventListener('touchstart',()=>ph4PrimeContext(),{passive:true});
+  });
+  ph4SetAudioUI('TAP START AUDIO',false);
+})();
+</script>
+
+
+<style id="phase5-parity-style">
+#ph5Tools{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 0}
+#ph5Tools button{min-height:34px;padding:7px 10px;border-radius:5px;border:1px solid #53616b;background:#242c32;color:#eef7fb;font-weight:800;cursor:pointer}
+#ph5Tools button.on{background:#17466a;border-color:#70bff0}
+#ph5Tools .danger{background:#592323;border-color:#a45151}
+</style>
+<script id="phase5-feature-parity">
+/* PHASE 5 — restore the workflow features from the last recreation without bypassing real firmware audio. */
+const ph5History=[],ph5Future=[];let ph5Clipboard=null,ph5LastStep=0,ph5Midi=null,ph5MidiOn=false,ph5TapTimes=[];
+function ph5Clone(x){return JSON.parse(JSON.stringify(x))}
+function ph5Snapshot(){return {length:p2Length,bpm:+document.getElementById('p2Bpm').value,swing:+document.getElementById('p2Swing').value,pattern:ph5Clone(p2Pattern),ratchets:ph5Clone(p2Ratchets),mix:ph5Clone(p2Mix),master:p2Master,currentId:p2Current?.id||null,machine:activeMachine}}
+function ph5Push(){ph5History.push(ph5Snapshot());if(ph5History.length>40)ph5History.shift();ph5Future.length=0}
+function ph5Restore(o){
+ p2Stop();p2Length=[16,32].includes(+o.length)?+o.length:16;document.getElementById('p2Len').value=String(p2Length);
+ for(const n of P2_PADS){p2Pattern[n]=Array(32).fill(0);for(let i=0;i<Math.min(32,o.pattern?.[n]?.length||0);i++)p2Pattern[n][i]=o.pattern[n][i]||0;p2Ratchets[n]=ph5Clone(o.ratchets?.[n]||{});if(o.mix?.[n])Object.assign(p2Mix[n],o.mix[n])}
+ if(o.bpm)document.getElementById('p2Bpm').value=o.bpm;if(o.swing!=null)document.getElementById('p2Swing').value=o.swing;
+ p2Master=o.master!=null?+o.master:p2Master;const m=document.getElementById('p2Master');if(m){m.value=Math.round(p2Master*100);document.getElementById('p2MasterV').textContent=m.value+'%'}
+ document.getElementById('p2BpmV').textContent=document.getElementById('p2Bpm').value;document.getElementById('p2SwingV').textContent=document.getElementById('p2Swing').value+'%';
+ p2Current=o.currentId?P2_PATTERNS.find(p=>p.id===o.currentId)||null:null;p2RenderGrid();p2BuildMixer();
+}
+function ph5Undo(){if(!ph5History.length)return;ph5Future.push(ph5Snapshot());ph5Restore(ph5History.pop())}
+function ph5Redo(){if(!ph5Future.length)return;ph5History.push(ph5Snapshot());ph5Restore(ph5Future.pop())}
+function ph5BarBase(){return p2Length===32&&ph5LastStep>=16?16:0}
+function ph5CopyBar(){const base=ph5BarBase();ph5Clipboard={pattern:{},ratchets:{}};for(const n of P2_PADS){ph5Clipboard.pattern[n]=p2Pattern[n].slice(base,base+16);ph5Clipboard.ratchets[n]={};for(const [k,v] of Object.entries(p2Ratchets[n]||{})){const q=+k;if(q>=base&&q<base+16)ph5Clipboard.ratchets[n][q-base]=v}}}
+function ph5PasteBar(){if(!ph5Clipboard)return;ph5Push();const base=ph5BarBase();for(const n of P2_PADS){for(let i=0;i<16;i++)p2Pattern[n][base+i]=ph5Clipboard.pattern[n]?.[i]||0;for(let i=0;i<16;i++)delete p2Ratchets[n][base+i];for(const [k,v] of Object.entries(ph5Clipboard.ratchets[n]||{}))p2Ratchets[n][base+(+k)]=v}p2RenderGrid()}
+function ph5ClearBar(){ph5Push();const base=ph5BarBase();for(const n of P2_PADS){for(let i=0;i<16;i++){p2Pattern[n][base+i]=0;delete p2Ratchets[n][base+i]}}p2RenderGrid()}
+function ph5Panic(){p2Stop();if(ph4PendingPlay){clearTimeout(ph4PendingPlay);ph4PendingPlay=0}for(const s of [...ph4AudioSources]){try{s.stop()}catch(_){}}ph4AudioSources.clear();p2PadQueue.length=0;columns.fill(0xff);const st=document.getElementById('p2PatternStatus');if(st)st.textContent='PANIC • ALL SOFTWARE AUDIO SOURCES STOPPED • FIRMWARE KEYS RELEASED'}
+function ph5Tap(){const now=performance.now();ph5TapTimes=ph5TapTimes.filter(t=>now-t<2500);ph5TapTimes.push(now);if(ph5TapTimes.length<2)return;const ds=[];for(let i=1;i<ph5TapTimes.length;i++)ds.push(ph5TapTimes[i]-ph5TapTimes[i-1]);const bpm=Math.max(40,Math.min(250,Math.round(60000/(ds.reduce((a,b)=>a+b,0)/ds.length))));const x=document.getElementById('p2Bpm');x.value=bpm;document.getElementById('p2BpmV').textContent=bpm}
+const ph5MidiMap={36:'KICK',38:'SNARE',39:'CLAPS',42:'CLOSED HAT',46:'OPEN HAT',41:'TOM 4',43:'TOM 3',45:'TOM 2',48:'TOM 1',49:'CRASH',51:'RIDE',37:'PERC 1'};
+async function ph5ToggleMidi(){const b=document.getElementById('ph5Midi');if(!navigator.requestMIDIAccess){if(b)b.textContent='MIDI UNSUPPORTED';return}if(ph5MidiOn){for(const i of ph5Midi?.inputs?.values()||[])i.onmidimessage=null;ph5MidiOn=false;if(b){b.textContent='ENABLE MIDI';b.classList.remove('on')}return}try{ph5Midi=await navigator.requestMIDIAccess();for(const i of ph5Midi.inputs.values())i.onmidimessage=e=>{const [st,n,v]=e.data;if((st&0xf0)===0x90&&v>0){const name=ph5MidiMap[n];if(name)p2Pulse(name,activeMachine==='sr16'?90:35)}};ph5MidiOn=true;if(b){b.textContent='MIDI ON';b.classList.add('on')}}catch(e){if(b)b.textContent='MIDI BLOCKED'}}
+
+/* Keep loaded pattern and transport running through machine changes. */
+const ph5BaseSwitch=ph3SwitchMachine;
+ph3SwitchMachine=function(key){const was=p2Playing||!!ph4PendingPlay,step=p2Step;ph5BaseSwitch(key);if(was){ph4ResumeStep=step;setTimeout(()=>p2Play(),70)}};
+
+/* Full-state save/load: remains backward-compatible with Phase-2 pattern files. */
+p2Save=function(){const o=ph5Snapshot();o.format='Alesis-Real-Firmware-Studio';o.version=2;const blob=new Blob([JSON.stringify(o,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Alesis_real_firmware_studio.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)};
+p2LoadFile=function(file){const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);ph5Push();if(o.machine&&PH3[o.machine]&&o.machine!==activeMachine)ph3SwitchMachine(o.machine);ph5Restore(o);p2Switch('patterns')}catch(e){alert('Pattern load failed: '+e.message)}};r.readAsText(file)};
+const ph5BaseLoadPattern=p2LoadPattern;p2LoadPattern=function(p,play=false){ph5Push();return ph5BaseLoadPattern(p,play)};
+const ph5BaseClear=p2Clear;p2Clear=function(){ph5Push();return ph5BaseClear()};
+
+(function ph5Install(){
+ const tr=document.getElementById('p2transport');if(tr&&!document.getElementById('ph5Tools')){const d=document.createElement('div');d.id='ph5Tools';d.style.flexBasis='100%';d.innerHTML='<button id="ph5Tap">TAP TEMPO</button><button id="ph5Undo">UNDO</button><button id="ph5Redo">REDO</button><button id="ph5Copy">COPY BAR</button><button id="ph5Paste">PASTE BAR</button><button id="ph5ClearBar">CLEAR BAR</button><button id="ph5Midi">ENABLE MIDI</button><button id="ph5Panic" class="danger">PANIC</button>';tr.appendChild(d);document.getElementById('ph5Tap').onclick=ph5Tap;document.getElementById('ph5Undo').onclick=ph5Undo;document.getElementById('ph5Redo').onclick=ph5Redo;document.getElementById('ph5Copy').onclick=ph5CopyBar;document.getElementById('ph5Paste').onclick=ph5PasteBar;document.getElementById('ph5ClearBar').onclick=ph5ClearBar;document.getElementById('ph5Midi').onclick=ph5ToggleMidi;document.getElementById('ph5Panic').onclick=ph5Panic}
+ const g=document.getElementById('p2Grid');if(g)g.addEventListener('pointerdown',e=>{const b=e.target.closest('.p2step');if(b){ph5LastStep=+b.dataset.step||0;ph5Push()}},true);
+ const len=document.getElementById('p2Len');if(len)len.addEventListener('change',()=>ph5Push(),true);
+ setTimeout(()=>{if(!p2Current&&!Object.values(p2Pattern).some(row=>row.some(Boolean))){p2Length=16;const x=document.getElementById('p2Len');if(x)x.value='16';p2RenderGrid()}},80);
+})();
+</script>
+
