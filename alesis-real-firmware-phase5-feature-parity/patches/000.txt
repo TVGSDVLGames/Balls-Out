@@ -161,4 +161,3 @@ const ph5BaseClear=p2Clear;p2Clear=function(){ph5Push();return ph5BaseClear()};
  setTimeout(()=>{if(!p2Current&&!Object.values(p2Pattern).some(row=>row.some(Boolean))){p2Length=16;const x=document.getElementById('p2Len');if(x)x.value='16';p2RenderGrid()}},80);
 })();
 </script>
-
