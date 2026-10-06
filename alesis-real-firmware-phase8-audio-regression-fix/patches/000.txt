@@ -1,0 +1,40 @@
+<style id="phase8-audio-regression-style">
+#ph8FixStatus{margin-top:8px;padding:7px;border:1px solid #41545d;border-radius:5px;background:#0a1013;color:#bfe7f4;font:700 10px/1.4 ui-monospace,monospace}
+#ph8FixStatus .ok{color:#a8e993}.ph8tag{display:inline-block;margin:2px 3px 2px 0;padding:2px 6px;border:1px solid #47616c;border-radius:999px}
+</style>
+<script id="phase8-audio-regression-fix">
+/* PHASE 8 — audio regression fixes from real firmware packet traces.
+   1) Zero-address DM3AG packets are control/stop messages, never ROM address 0 audio.
+   2) Nonlinear attenuation keeps SR-16 dry + room layers balanced.
+   3) SR-16 UI/pattern triggers queue until firmware is actually ready, with one missed-scan retry. */
+const ph8Stats={stopPackets:0,retries:0,queued:0,misses:0,starts:0,lastPad:'',lastPacket:null};
+const PH8_SR_READY_CYCLES=3600000;
+let ph8ReadyQueue=[],ph8ReadyTimer=0,ph8PendingPlay=0;
+function ph8SetStatus(msg){const e=document.getElementById('ph8FixStatus');if(e)e.lastChild.nodeValue=' '+msg}
+function ph8DMGain(raw){const x=ph7Clamp((248-ph7Clamp(raw||0,0,248))/248,0,1);return x*x*x}
+function ph8PanGains(code){const p=ph7Clamp(code|0,0,6)/6,a=p*Math.PI/2;return [Math.cos(a),Math.sin(a)]}
+ph7DMAttenuation=ph8DMGain;
+ph7PanGains=ph8PanGains;
+function ph8IsStopPacket(c){return c[0]===0&&c[1]===0&&c[2]===0&&(c[3]===0||c[3]>=240)}
+function ph8ReadyDelay(){if(activeMachine!=='sr16'||!cpu)return 0;return Math.max(0,Math.ceil((PH8_SR_READY_CYCLES-cpu.cycles)/1000)+100)}
+function ph8FlushReady(){ph8ReadyTimer=0;if(activeMachine!=='sr16'){ph8ReadyQueue.length=0;return}const wait=ph8ReadyDelay();if(wait>0){ph8ReadyTimer=setTimeout(ph8FlushReady,Math.min(700,wait));return}const q=ph8ReadyQueue.splice(0);q.forEach((fn,i)=>setTimeout(()=>{try{fn()}catch(e){console.error('phase8 queued trigger',e)}},i*16));ph8SetStatus('SR-16 READY • queued triggers released')}
+function ph8WhenReady(fn){if(activeMachine!=='sr16'||ph8ReadyDelay()<=0){fn();return true}ph8ReadyQueue.push(fn);if(ph8ReadyQueue.length>24)ph8ReadyQueue.shift();ph8Stats.queued++;if(!ph8ReadyTimer)ph8ReadyTimer=setTimeout(ph8FlushReady,Math.min(700,ph8ReadyDelay()));ph8SetStatus('SR-16 BOOTING • trigger queued');return false}
+function ph8PressNow(c,b,el,opt={}){const name=ACTIVE_MATRIX[c]?.[b],isPad=!!(name&&activeCfg.pads.has(name)),hold=activeMachine==='sr16'?110:85,before=cmdCount;if(isPad&&opt.queue!==false){p2QueuePad(name,opt.velocity||110);ph8Stats.lastPad=name}columns[c]&=~(1<<b);el&&el.classList.add('down');setTimeout(()=>{columns[c]|=(1<<b);el&&el.classList.remove('down')},hold);if(activeMachine==='sr16'&&isPad&&opt.retry!==false){setTimeout(()=>{if(activeMachine==='sr16'&&cmdCount===before){ph8Stats.misses++;ph8Stats.retries++;columns[c]|=(1<<b);setTimeout(()=>{columns[c]&=~(1<<b);setTimeout(()=>columns[c]|=(1<<b),135)},18);ph8SetStatus('SR-16 missed scan recovered • '+name)}},285)}}
+pressMatrix=function(c,b,el){ph4PrimeContext();const go=()=>ph8PressNow(c,b,el,{queue:true,retry:true});if(activeMachine==='sr16')ph8WhenReady(go);else go()};
+p2Pulse=function(name,hold=18,velocity=110){if(!ph6Audible(name))return;const fire=()=>{const q=p2Coord(name);if(!q)return;p2QueuePad(name,velocity);ph8Stats.lastPad=name;const[c,b]=q,minimum=activeMachine==='sr16'?105:24;columns[c]&=~(1<<b);setTimeout(()=>{columns[c]|=(1<<b)},Math.max(minimum,hold||0))};if(activeMachine==='sr16')ph8WhenReady(fire);else fire()};
+/* Preserve the real packet stream. The SR-16 explicitly sends zero-address slot-stop packets for Single/Group behavior. */
+dmWrite=function(v){
+ dmBytes.push(v&255);if(dmBytes.length<5)return;const c=dmBytes.splice(0,5),ptr=((c[0]<<12)|(c[1]<<4))>>>0,tune=c[2]&255,atten=c[3]&255,pan=(c[4]>>5)&7,out=(c[4]&0x10)?1:2,slot=c[4]&15,isStop=ph8IsStopPacket(c);
+ lastCmd={c,ptr,tune,low:tune&15,tuneHi:(tune>>4)&15,vol:atten,attenuation:atten,pan,out,slot,isStop};cmdCount++;ph7Trace.packets++;ph7Trace.last=lastCmd;ph8Stats.lastPacket=lastCmd;
+ if(isStop){ph8Stats.stopPackets++;ph7StopSlot(slot)}else{ph7PendingDM=lastCmd;playDM(ptr,lastCmd);ph7PendingDM=null;ph8Stats.starts++}updateDebug();
+};
+/* The Phase-7 pitch path is retained; the audible regression was layer gain/control-packet handling, not the firmware tuning byte. */
+updateDebug=function(){if(!cpu)return;const pc=cpu.pc.toString(16).padStart(4,'0').toUpperCase();let d=`PC $${pc}   machine cycles ${cpu.cycles.toLocaleString()}   DM3AG packets ${cmdCount}`;if(lastCmd)d+=`\nDM3AG ${lastCmd.c.map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' ')} → ${lastCmd.isStop?'STOP SLOT '+lastCmd.slot:'ROM $'+lastCmd.ptr.toString(16).padStart(5,'0').toUpperCase()+' tune=$'+lastCmd.tune.toString(16).padStart(2,'0')+' atten=$'+lastCmd.vol.toString(16).padStart(2,'0')+' pan='+lastCmd.pan+' out='+lastCmd.out+' slot='+lastCmd.slot}`;$('debug').textContent=d};
+const ph8BasePlay=p2Play;
+p2Play=function(){ph4PrimeContext();if(activeMachine==='sr16'&&ph8ReadyDelay()>0){if(ph8PendingPlay)return;ph8PendingPlay=1;ph8WhenReady(()=>{ph8PendingPlay=0;ph8BasePlay()});const s=document.getElementById('p2PatternStatus');if(s)s.textContent='SR-16 REAL FIRMWARE BOOTING • PLAY QUEUED';return}return ph8BasePlay.apply(this,arguments)};
+const ph8BaseStop=p2Stop;
+p2Stop=function(){ph8PendingPlay=0;return ph8BaseStop.apply(this,arguments)};
+const ph8BaseSwitch=ph3SwitchMachine;
+ph3SwitchMachine=function(key){ph8ReadyQueue.length=0;if(ph8ReadyTimer){clearTimeout(ph8ReadyTimer);ph8ReadyTimer=0}ph8PendingPlay=0;const r=ph8BaseSwitch.apply(this,arguments);setTimeout(()=>{if(activeMachine==='sr16'&&ph8ReadyDelay()>0){ph8SetStatus('SR-16 BOOTING • clicks will queue until ready');const w=ph8ReadyDelay();setTimeout(()=>{if(activeMachine==='sr16'&&ph8ReadyDelay()<=0)ph8SetStatus('SR-16 READY • control packets filtered • layer gain corrected')},w+180)}else ph8SetStatus(activeCfg.name+' READY • control packets filtered • layer gain corrected')},30);return r};
+(function ph8Install(){const p7=document.getElementById('ph7Hardware');if(p7&&!document.getElementById('ph8FixStatus')){const d=document.createElement('div');d.id='ph8FixStatus';d.innerHTML='<span class="ph8tag ok">PHASE 8</span><span class="ph8tag">CONTROL-PACKET FILTER</span><span class="ph8tag">NONLINEAR ATTENUATION</span><span class="ph8tag">SR-16 CLICK RETRY</span> READY';p7.appendChild(d)}const old=p2UpdateDiag;p2UpdateDiag=function(){old&&old();const d=document.getElementById('p2Diag');if(d)d.textContent+=` • P8 stops ${ph8Stats.stopPackets} • retries ${ph8Stats.retries} • queued ${ph8Stats.queued}`};ph8SetStatus(activeMachine==='sr16'?'SR-16 BOOTING • clicks will queue until ready':activeCfg.name+' READY')})();
+</script>
