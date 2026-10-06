@@ -1,0 +1,52 @@
+th||0);i++)p2Pattern[n][i]=o.pattern[n][i]||0;p2Ratchets[n]=ph5Clone(o.ratchets?.[n]||{});if(o.mix?.[n])Object.assign(p2Mix[n],o.mix[n])}
+ if(o.bpm)document.getElementById('p2Bpm').value=o.bpm;if(o.swing!=null)document.getElementById('p2Swing').value=o.swing;
+ p2Master=o.master!=null?+o.master:p2Master;const m=document.getElementById('p2Master');if(m){m.value=Math.round(p2Master*100);document.getElementById('p2MasterV').textContent=m.value+'%'}
+ document.getElementById('p2BpmV').textContent=document.getElementById('p2Bpm').value;document.getElementById('p2SwingV').textContent=document.getElementById('p2Swing').value+'%';
+ p2Current=o.currentId?P2_PATTERNS.find(p=>p.id===o.currentId)||null:null;p2RenderGrid();p2BuildMixer();
+}
+function ph5Undo(){if(!ph5History.length)return;ph5Future.push(ph5Snapshot());ph5Restore(ph5History.pop())}
+function ph5Redo(){if(!ph5Future.length)return;ph5History.push(ph5Snapshot());ph5Restore(ph5Future.pop())}
+function ph5BarBase(){return p2Length===32&&ph5LastStep>=16?16:0}
+function ph5CopyBar(){const base=ph5BarBase();ph5Clipboard={pattern:{},ratchets:{}};for(const n of P2_PADS){ph5Clipboard.pattern[n]=p2Pattern[n].slice(base,base+16);ph5Clipboard.ratchets[n]={};for(const [k,v] of Object.entries(p2Ratchets[n]||{})){const q=+k;if(q>=base&&q<base+16)ph5Clipboard.ratchets[n][q-base]=v}}}
+function ph5PasteBar(){if(!ph5Clipboard)return;ph5Push();const base=ph5BarBase();for(const n of P2_PADS){for(let i=0;i<16;i++)p2Pattern[n][base+i]=ph5Clipboard.pattern[n]?.[i]||0;for(let i=0;i<16;i++)delete p2Ratchets[n][base+i];for(const [k,v] of Object.entries(ph5Clipboard.ratchets[n]||{}))p2Ratchets[n][base+(+k)]=v}p2RenderGrid()}
+function ph5ClearBar(){ph5Push();const base=ph5BarBase();for(const n of P2_PADS){for(let i=0;i<16;i++){p2Pattern[n][base+i]=0;delete p2Ratchets[n][base+i]}}p2RenderGrid()}
+function ph5Panic(){p2Stop();if(ph4PendingPlay){clearTimeout(ph4PendingPlay);ph4PendingPlay=0}for(const s of [...ph4AudioSources]){try{s.stop()}catch(_){}}ph4AudioSources.clear();p2PadQueue.length=0;columns.fill(0xff);const st=document.getElementById('p2PatternStatus');if(st)st.textContent='PANIC • ALL SOFTWARE AUDIO SOURCES STOPPED • FIRMWARE KEYS RELEASED'}
+function ph5Tap(){const now=performance.now();ph5TapTimes=ph5TapTimes.filter(t=>now-t<2500);ph5TapTimes.push(now);if(ph5TapTimes.length<2)return;const ds=[];for(let i=1;i<ph5TapTimes.length;i++)ds.push(ph5TapTimes[i]-ph5TapTimes[i-1]);const bpm=Math.max(40,Math.min(250,Math.round(60000/(ds.reduce((a,b)=>a+b,0)/ds.length))));const x=document.getElementById('p2Bpm');x.value=bpm;document.getElementById('p2BpmV').textContent=bpm}
+const ph5MidiMap={36:'KICK',38:'SNARE',39:'CLAPS',42:'CLOSED HAT',46:'OPEN HAT',41:'TOM 4',43:'TOM 3',45:'TOM 2',48:'TOM 1',49:'CRASH',51:'RIDE',37:'PERC 1'};
+async function ph5ToggleMidi(){const b=document.getElementById('ph5Midi');if(!navigator.requestMIDIAccess){if(b)b.textContent='MIDI UNSUPPORTED';return}if(ph5MidiOn){for(const i of ph5Midi?.inputs?.values()||[])i.onmidimessage=null;ph5MidiOn=false;if(b){b.textContent='ENABLE MIDI';b.classList.remove('on')}return}try{ph5Midi=await navigator.requestMIDIAccess();for(const i of ph5Midi.inputs.values())i.onmidimessage=e=>{const [st,n,v]=e.data;if((st&0xf0)===0x90&&v>0){const name=ph5MidiMap[n];if(name)p2Pulse(name,activeMachine==='sr16'?90:35)}};ph5MidiOn=true;if(b){b.textContent='MIDI ON';b.classList.add('on')}}catch(e){if(b)b.textContent='MIDI BLOCKED'}}
+
+/* Keep loaded pattern and transport running through machine changes. */
+const ph5BaseSwitch=ph3SwitchMachine;
+ph3SwitchMachine=function(key){const was=p2Playing||!!ph4PendingPlay,step=p2Step;ph5BaseSwitch(key);if(was){ph4ResumeStep=step;setTimeout(()=>p2Play(),70)}};
+
+/* Full-state save/load: remains backward-compatible with Phase-2 pattern files. */
+p2Save=function(){const o=ph5Snapshot();o.format='Alesis-Real-Firmware-Studio';o.version=2;const blob=new Blob([JSON.stringify(o,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Alesis_real_firmware_studio.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)};
+p2LoadFile=function(file){const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);ph5Push();if(o.machine&&PH3[o.machine]&&o.machine!==activeMachine)ph3SwitchMachine(o.machine);ph5Restore(o);p2Switch('patterns')}catch(e){alert('Pattern load failed: '+e.message)}};r.readAsText(file)};
+const ph5BaseLoadPattern=p2LoadPattern;p2LoadPattern=function(p,play=false){ph5Push();return ph5BaseLoadPattern(p,play)};
+const ph5BaseClear=p2Clear;p2Clear=function(){ph5Push();return ph5BaseClear()};
+
+(function ph5Install(){
+ const tr=document.getElementById('p2transport');if(tr&&!document.getElementById('ph5Tools')){const d=document.createElement('div');d.id='ph5Tools';d.style.flexBasis='100%';d.innerHTML='<button id="ph5Tap">TAP TEMPO</button><button id="ph5Undo">UNDO</button><button id="ph5Redo">REDO</button><button id="ph5Copy">COPY BAR</button><button id="ph5Paste">PASTE BAR</button><button id="ph5ClearBar">CLEAR BAR</button><button id="ph5Midi">ENABLE MIDI</button><button id="ph5Panic" class="danger">PANIC</button>';tr.appendChild(d);document.getElementById('ph5Tap').onclick=ph5Tap;document.getElementById('ph5Undo').onclick=ph5Undo;document.getElementById('ph5Redo').onclick=ph5Redo;document.getElementById('ph5Copy').onclick=ph5CopyBar;document.getElementById('ph5Paste').onclick=ph5PasteBar;document.getElementById('ph5ClearBar').onclick=ph5ClearBar;document.getElementById('ph5Midi').onclick=ph5ToggleMidi;document.getElementById('ph5Panic').onclick=ph5Panic}
+ const g=document.getElementById('p2Grid');if(g)g.addEventListener('pointerdown',e=>{const b=e.target.closest('.p2step');if(b){ph5LastStep=+b.dataset.step||0;ph5Push()}},true);
+ const len=document.getElementById('p2Len');if(len)len.addEventListener('change',()=>ph5Push(),true);
+ setTimeout(()=>{if(!p2Current&&!Object.values(p2Pattern).some(row=>row.some(Boolean))){p2Length=16;const x=document.getElementById('p2Len');if(x)x.value='16';p2RenderGrid()}},80);
+})();
+</script>
+
+
+<style id="phase6-advanced-parity-style">
+#ph6Advanced{border-color:#4b5662;background:linear-gradient(180deg,#171d22,#101418)}
+#ph6Advanced .ph6bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+#ph6Advanced label{display:flex;gap:6px;align-items:center;font:700 10px ui-monospace,monospace;color:#cbd3da}
+#ph6Advanced .ph6status{font:700 10px/1.45 ui-monospace,monospace;color:#b9c7d1;background:#090c0e;border:1px solid #343d45;border-radius:6px;padding:8px;min-height:34px}
+#ph6Advanced .ph6metergrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ph6meter{height:8px;background:#090b0d;border:1px solid #3e4750;border-radius:4px;overflow:hidden}.ph6meter i{display:block;height:100%;width:0;background:#d6ad57;transition:width .08s}
+.p2mixrow.ph6mix{grid-template-columns:minmax(90px,1.2fr) auto auto minmax(120px,1fr) minmax(120px,1fr) minmax(120px,1fr) auto minmax(180px,1.5fr);gap:7px;align-items:center}
+.p2mixrow.ph6mix label{min-width:0}.p2mixrow.ph6mix select{max-width:100%;min-width:0}.p2mixrow.ph6mix .ph6solo.on{background:#725b19;color:#fff}.p2mixrow.ph6mix .ph6mute.on{background:#7b312e;color:#fff}
+@media(max-width:1050px){.p2mixrow.ph6mix{grid-template-columns:repeat(4,minmax(0,1fr))}.p2mixrow.ph6mix .name{grid-column:1/-1}}
+@media(max-width:650px){.p2mixrow.ph6mix{grid-template-columns:repeat(2,minmax(0,1fr))}.ph6voice{grid-column:1/-1}}
+</style>
+
+<script id="phase6-advanced-parity">
+/* PHASE 6 — advanced Pass-40 workflow parity while retaining real-firmware DM3AG generation by default. */
+const PH6_MODELS={"hr16":{"display":"HR-16","voices":[{"num":1,"name":"24\" POWER KICK","ptr":110128},{"num":2,"name":"22\" DEEP KICK","ptr":85104},{"num":3,"name":"22\" POWER KICK","ptr":32032},{"num":4,"name":"20\" SWIFT KICK","ptr":22016},{"num":5,"name":"22\"DBL HD KICK A","ptr":45072},{"num":6,"name":"22\"DBL HD KICK B","ptr":65088},{
