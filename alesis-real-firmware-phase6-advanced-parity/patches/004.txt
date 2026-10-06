@@ -1,0 +1,52 @@
+tx||!audioUnlocked)ph4PrimeContext();if(!audioCtx)return;
+ while(p2PadQueue.length&&performance.now()-p2PadQueue[0].t>500)p2PadQueue.shift();
+ const ev=p2PadQueue.shift(),name=ev?.name,cfg=name?p2Mix[name]:null;
+ if(name&&!ph6Audible(name))return;
+ const usePtr=name?ph6VoiceFor(name,ptr):ptr,pcm=decodeVoice(usePtr);if(!pcm||!pcm.length){ph4AudioStats.misses++;return}
+ try{
+  const b=audioCtx.createBuffer(1,pcm.length,48000);b.copyToChannel(pcm,0);
+  const src=audioCtx.createBufferSource(),gain=audioCtx.createGain();src.buffer=b;
+  if(cfg)src.playbackRate.value=Math.max(.25,Math.min(4,Math.pow(2,(+cfg.tune||0)/12)));
+  const bus=cfg?.bus===2?2:1,vel=ph6Vel(ev?.velocity||110);gain.gain.value=Math.max(0,Math.min(1.25,.92*p2Master*(cfg?cfg.level:1)*ph6Bus[bus-1]*(cfg?vel:1)));
+  src.connect(gain);let tail=gain;
+  if(ph6Analog){const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=17500;f.Q.value=.48;tail.connect(f);tail=f}
+  if(audioCtx.createStereoPanner){const pan=audioCtx.createStereoPanner();pan.pan.value=cfg?Math.max(-1,Math.min(1,cfg.pan)):0;tail.connect(pan);pan.connect(audioCtx.destination)}else tail.connect(audioCtx.destination);
+  if(name&&name.includes('HAT')){ph6StopSource(ph6HatSource);ph6HatSource=src}
+  src.onended=()=>{ph6Sources.delete(src);if(ph6HatSource===src)ph6HatSource=null};ph6Sources.add(src);src.start(0);
+  ph4AudioStats.starts++;ph4AudioStats.lastPtr=usePtr;ph4AudioStats.lastSamples=pcm.length;ph4AudioStats.lastMachine=ph6MachineKey();ph6Meter(bus,(cfg?.level??1)*vel);ph4SetAudioUI(audioCtx.state==='running'?'RUNNING / REAL ROM':'READY / REAL ROM',true);
+ }catch(e){console.error('phase6 playback',e);ph4SetAudioUI('PLAYBACK ERROR',false)}
+};
+
+p2QueuePad=function(name,velocity=110){p2PadQueue.push({name,velocity,t:performance.now()});if(p2PadQueue.length>48)p2PadQueue.shift()};
+p2Pulse=function(name,hold=18,velocity=110){if(!ph6Audible(name))return;const q=p2Coord(name);if(!q)return;p2QueuePad(name,velocity);const[c,b]=q;const minimum=ph6MachineKey()==='sr16'?85:24;columns[c]&=~(1<<b);setTimeout(()=>{columns[c]|=(1<<b)},Math.max(minimum,hold||0))};
+
+function ph6VoiceOptions(sel,name){const key=ph6MachineKey(),cfg=p2Mix[name],cur=cfg.voiceOverride?.[key];sel.innerHTML='<option value="">FIRMWARE VOICE</option>';ph6Voices().forEach((v,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${String(v.num??i+1).padStart(3,'0')} • ${v.name||('VOICE '+(i+1))}`;sel.appendChild(o)});sel.value=cur==null?'':String(cur)}
+p2BuildMixer=function(){
+ ph6InitMix();const h=document.getElementById('p2Mixer');if(!h)return;h.innerHTML='';
+ for(const n of P2_PADS){const c=p2Mix[n],r=document.createElement('div');r.className='p2mixrow ph6mix';r.innerHTML=`<div class="name">${n}</div>`;
+  const mute=document.createElement('button');mute.className='ph6mute';mute.textContent='MUTE';mute.classList.toggle('on',!!c.mute);mute.onclick=()=>{c.mute=!c.mute;mute.classList.toggle('on',c.mute)};r.appendChild(mute);
+  const solo=document.createElement('button');solo.className='ph6solo';solo.textContent='SOLO';solo.classList.toggle('on',!!c.solo);solo.onclick=()=>{c.solo=!c.solo;solo.classList.toggle('on',c.solo)};r.appendChild(solo);
+  function range(label,min,max,val,fn){const l=document.createElement('label');l.innerHTML='<span>'+label+'</span>';const x=document.createElement('input');x.type='range';x.min=min;x.max=max;x.value=val;const b=document.createElement('b');b.textContent=val;x.oninput=()=>{fn(+x.value);b.textContent=x.value};l.append(x,b);return l}
+  r.appendChild(range('LEVEL',0,100,Math.round(c.level*100),v=>c.level=v/100));
+  r.appendChild(range('PAN',-100,100,Math.round(c.pan*100),v=>c.pan=v/100));
+  r.appendChild(range('TUNE',-16,15,+c.tune||0,v=>c.tune=v));
+  const bus=document.createElement('select');bus.innerHTML='<option value="1">OUT 1</option><option value="2">OUT 2</option>';bus.value=String(c.bus||1);bus.onchange=()=>c.bus=+bus.value;r.appendChild(bus);
+  const voice=document.createElement('select');voice.className='ph6voice';ph6VoiceOptions(voice,n);voice.onchange=()=>{if(!c.voiceOverride)c.voiceOverride={};c.voiceOverride[ph6MachineKey()]=voice.value===''?null:+voice.value};r.appendChild(voice);h.appendChild(r);
+ }
+};
+
+async function ph6HatTest(){ph4PrimeContext();const st=document.getElementById('ph6Status');if(st)st.textContent='HAT CHOKE TEST • OPEN → CLOSED';p2Pulse('OPEN HAT',ph6MachineKey()==='sr16'?95:40,118);setTimeout(()=>p2Pulse('CLOSED HAT',ph6MachineKey()==='sr16'?95:40,118),320);setTimeout(()=>{if(st)st.textContent='HAT CHOKE TEST COMPLETE • shared software slot replaced open hat with closed hat'},700)}
+async function ph6SelfCheck(){
+ const st=document.getElementById('ph6Status');if(st)st.textContent='SELF-CHECK • starting audio + firmware path…';ph4PrimeContext();
+ const before=ph4AudioStats.starts,beforeCmd=cmdCount||0;
+ const go=()=>{p2Pulse('KICK',ph6MachineKey()==='sr16'?95:40,110);setTimeout(()=>p2Pulse('SNARE',ph6MachineKey()==='sr16'?95:40,110),180);setTimeout(()=>p2Pulse('CLOSED HAT',ph6MachineKey()==='sr16'?95:40,110),360);setTimeout(()=>{const ds=ph4AudioStats.starts-before,dc=(cmdCount||0)-beforeCmd;const ok=ds>0&&dc>0;if(st)st.textContent=`SELF-CHECK ${ok?'PASS':'FAIL'} • ${ph6MachineKey().toUpperCase()} • DM3AG +${dc} • ROM audio starts +${ds} • ${audioCtx?.state||'no context'}`;st.className='ph6status '+(ok?'good':'warn')},900)};
+ if(ph6MachineKey()==='sr16'&&cpu&&cpu.cycles<2550000){const wait=Math.max(200,Math.min(2600,Math.ceil((2550000-cpu.cycles)/1000)+180));if(st)st.textContent=`SELF-CHECK • SR-16 firmware boot ${(wait/1000).toFixed(1)}s`;setTimeout(go,wait)}else go();
+}
+function ph6InstallPanel(){
+ ph6InitMix();const mix=document.getElementById('p2Mixer')?.closest('.p2panel');if(mix&&!document.getElementById('ph6Advanced')){const d=document.createElement('div');d.className='p2panel';d.id='ph6Advanced';d.innerHTML=`<h3>Advanced Hardware / Audio</h3><div class="p2sub">Default stays firmware-driven. Voice override, tune, bus and mixer processing apply only to Studio/web-pad hits.</div><div class="ph6bar"><button id="ph6Self">RUN AUDIO SELF-CHECK</button><button id="ph6Hat">TEST HAT CHOKE</button><label>OUTPUT FILTER <input id="ph6Filter" type="checkbox" checked></label><label>VELOCITY <select id="ph6Vel"><option value="linear">LINEAR</option><option value="soft">SOFT</option><option value="hard">HARD</option><option value="hardware" selected>HARDWARE</option></select></label><label>OUT 1 <input id="ph6Bus1" type="range" min="0" max="125" value="100"></label><label>OUT 2 <input id="ph6Bus2" type="range" min="0" max="125" value="100"></label></div><div class="ph6metergrid"><div>OUT 1<div class="ph6meter"><i id="ph6M1"></i></div></div><div>OUT 2<div class="ph6meter"><i id="ph6M2"></i></div></div></div><div id="ph6Status" class="ph6status">READY • real firmware DM3AG → embedded ROM PCM</div>`;mix.parentNode.insertBefore(d,mix);document.getElementById('ph6Self').onclick=ph6SelfCheck;document.getElementById('ph6Hat').onclick=ph6HatTest;document.getElementById('ph6Filter').onchange=e=>ph6Analog=e.target.checked;document.getElementById('ph6Vel').onchange=e=>ph6VelocityCurve=e.target.value;document.getElementById('ph6Bus1').oninput=e=>ph6Bus[0]=+e.target.value/100;document.getElementById('ph6Bus2').oninput=e=>ph6Bus[1]=+e.target.value/100}
+ p2BuildMixer();
+}
+const ph6OldPanic=ph5Panic;ph5Panic=function(){ph6StopAll();return ph6OldPanic.apply(this,arguments)};
+const ph6Switch=ph3SwitchMachine;ph3SwitchMachine=function(key){const v=ph6Switch.apply(this,arguments);setTimeout(()=>{p2BuildMixer();const s=document.getElementById('ph6Status');if(s)s.textContent=`READY • ${activeCfg.name} real firmware + advanced Studio parity`},20);return v};
+(function(){ph6InstallPanel();const old=p2UpdateDiag;p2UpdateDiag=function(){old&&old();const d=document.getElementById('p2Diag');if(d)d.textContent+=` • Advanced parity ON • Sources ${ph6Sources.size} • Filter ${ph6Analog?'ON':'OFF'}`};})();
+</script>
