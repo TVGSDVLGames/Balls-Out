@@ -58,7 +58,8 @@ dmWrite=function(v){
  lastCmd={c,ptr,tune,low:tune&15,tuneHi:(tune>>4)&15,vol:atten,attenuation:atten,pan,out,slot,isStop};cmdCount++;ph7Trace.packets++;ph7Trace.last=lastCmd;
  if(isStop)ph7StopSlot(slot);else{ph7PendingDM=lastCmd;playDM(ptr,lastCmd);ph7PendingDM=null}updateDebug();
 };
-updateDebug=function(){if(!cpu)return;const pc=cpu.pc.toString(16).padStart(4,'0').toUpperCase();let d=`PC $${pc}   machine cycles ${cpu.cycles.toLocaleString()}   DM3AG packets ${cmdCount}`;if(lastCmd)d+=`\nDM3AG ${lastCmd.c.map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' ')} → ROM $${lastCmd.ptr.toString(16).padStart(5,'0').toUpperCase()}  tune=$${lastCmd.tune.toString(16).padStart(2,'0')} atten=$${lastCmd.vol.toString(16).padStart(2,'0')} pan=${lastCmd.pan} out=${lastCmd.out} slot=${lastCmd.slot}${lastCmd.isStop?' STOP':''}`;$('debug').textContent=d};
+updateDebug=function(){if(!cpu)return;const pc=cpu.pc.toString(16).padStart(4,'0').toUpperCase();let d=`PC $${pc}   machine cycles ${cpu.cycles.toLocaleString()}   DM3AG packets ${cmdCount}`;if(lastCmd)d+=`
+DM3AG ${lastCmd.c.map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' ')} → ROM $${lastCmd.ptr.toString(16).padStart(5,'0').toUpperCase()}  tune=$${lastCmd.tune.toString(16).padStart(2,'0')} atten=$${lastCmd.vol.toString(16).padStart(2,'0')} pan=${lastCmd.pan} out=${lastCmd.out} slot=${lastCmd.slot}${lastCmd.isStop?' STOP':''}`;$('debug').textContent=d};
 playDM=function(ptr,dmArg){
  if(!audioCtx||!audioUnlocked)ph4PrimeContext();if(!audioCtx)return;const dm=dmArg||ph7PendingDM||lastCmd;if(!dm)return;const ev=ph7ResolveEvent(),name=ev?.name,cfg=name?p2Mix[name]:null;if(name&&!ph6Audible(name)){ph7StopSlot(dm.slot);return}
  const sr=ph7SRVoiceEntry(cfg);if(sr&&ev){if(ev._ph7OverrideDone)return;ev._ph7OverrideDone=true;if(ph7PlaySRProgram(sr,cfg,ev,dm))return}
