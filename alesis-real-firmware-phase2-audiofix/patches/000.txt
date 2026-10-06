@@ -16,4 +16,3 @@ p2Pulse=function(name,hold=18){const mix=p2Mix[name];if(mix?.mute)return;const q
 const p2AudioOldPlay=p2Play;p2Play=function(){p2AudioPrime();return p2AudioOldPlay.apply(this,arguments)};
 (function(){const box=document.querySelector('.sliderbox');if(box){const b=document.createElement('button');b.id='p2AudioStartFix';b.textContent='START AUDIO';const f=e=>{try{e&&e.preventDefault()}catch(_){}p2AudioPrime()};b.addEventListener('touchstart',f,{passive:false});b.addEventListener('pointerdown',f,{passive:false});b.addEventListener('click',f,{passive:false});box.appendChild(b)}document.querySelectorAll('#pads button,#controls button,#p2Play,[data-fwshortcut]').forEach(el=>{el.addEventListener('pointerdown',p2AudioPrime,{passive:true});el.addEventListener('touchstart',p2AudioPrime,{passive:true})})})();
 </script>
-
