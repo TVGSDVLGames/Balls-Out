@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alesis Analog Poly Studio — Loading</title><style>html,body{margin:0;background:#111;color:#eee;font:14px system-ui}main{min-height:100vh;display:flex;justify-content:center;align-items:center;flex-direction:column;gap:14px}progress{width:min(320px,80vw)}</style></head><body><main><strong>Loading Alesis Analog Poly Studio Phase 10</strong><progress id="load" max="100" value="0"></progress><div id="status">Loading factory ROMs and sound engine…</div></main><script>
+(async()=>{
+const names=["parts/part00.txt", "parts/part01.txt", "parts/part02.txt", "parts/part03.txt", "parts/part04.txt", "parts/part05.txt", "parts/part06.txt", "parts/part07.txt", "parts/part08.txt", "parts/part09.txt"];
+const progress=document.getElementById('load');
+let done=0;
+const chunks=await Promise.all(names.map(async(name)=>{
+ const response=await fetch(name, {cache:'no-cache'});
+ if(!response.ok)throw Error('Unable to load '+name+' (HTTP '+response.status+')');
+ const s=await response.text();progress.value=100*(++done)/names.length;
+ return s;
+}));
+const html=chunks.join('');
+if(html.length!==4531842 || !html.includes('window.__ALESIS_AUDIO_ENGINE__'))throw Error('ROM or sound engine source incomplete; reload.');
+document.open('text/html','replace');document.write(html);document.close();
+})().catch(err=>{document.getElementById('status').textContent='Load failed: '+err.message;document.getElementById('load').hidden=true;});
+</script></body></html>
