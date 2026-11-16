@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0d12">
+<title>NIN MIDI Remix Lab — Electro-Industrial / Glitch / Arpeggiator</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0e13;--pane:#131922;--pane2:#19212b;--edge:#344050;--text:#eef3f6;--muted:#a0aebc;--acid:#c9ed67;--blue:#8ce9d1;--pink:#fa85b3}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
+button,select,input{font:inherit}
+button,select{background:#26313d;color:var(--text);border:1px solid #4b5a69;border-radius:7px;padding:8px 11px;cursor:pointer}
+button:hover{background:#384556}button:disabled{opacity:.4;cursor:default}
+button.active,button.selected{background:#c9ed67;color:#111b09;border-color:#c9ed67;font-weight:750}
+button.primary{background:var(--acid);color:#142008;border-color:var(--acid);font-weight:800}
+a{color:var(--acid)}input[type=range],input[type=checkbox]{accent-color:var(--acid)}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:19px 25px;border-bottom:1px solid var(--edge);background:#10151b}
+header h1{margin:0;font-size:22px;letter-spacing:.015em}
+h2{font-size:14px;margin:0 0 11px;font-weight:800;letter-spacing:.10em;color:var(--acid)}
+.caption{font-size:12px;color:var(--muted);margin-top:3px}
+.badge{padding:7px 11px;border:1px solid #587335;border-radius:22px;background:#222d1a;color:var(--acid);font-size:11px;font-weight:700}
+.shell{display:grid;grid-template-columns:303px minmax(0,1fr);min-height:calc(100vh - 83px)}
+aside{background:#11161d;border-right:1px solid var(--edge);padding:16px;overflow-y:auto;max-height:calc(100vh - 83px)}
+main{padding:18px 20px 32px;min-width:0}
+.selectSong{width:100%;font-size:15px;font-weight:750;padding:11px;margin:7px 0}
+.hint{color:var(--muted);font-size:12px;line-height:1.6}
+.line{height:1px;background:var(--edge);margin:17px 0}
+.row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.track{padding:9px 0;display:flex;align-items:center;gap:5px;border-bottom:1px solid #2b3541}
+.track input{width:17px;height:17px;flex:0 0 17px}
+.trackname{min-width:0;flex:1;margin-left:3px}
+.trackname strong{font-weight:650;font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trackname small{display:block;font-size:10px;color:var(--muted)}
+.minibtn{padding:5px 7px;line-height:1.1;font-size:10px;flex-shrink:0}
+.statrow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:15px}
+.stat{padding:10px 11px;background:var(--pane);border:1px solid var(--edge);border-radius:8px}
+.stat strong{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat small{color:var(--muted);font-size:10px}
+.card{background:var(--pane);border:1px solid var(--edge);padding:14px 15px;border-radius:9px;margin-bottom:13px}
+.transport{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#seek{width:100%;margin:13px 0 0;height:19px}
+#time{font-weight:700;font-variant-numeric:tabular-nums;margin-left:8px}
+.presetrow{display:flex;flex-wrap:wrap;gap:8px}
+.presetrow button{font-size:13px;font-weight:600}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.control{border:1px solid #334253;border-radius:8px;padding:10px;background:var(--pane2);min-width:0}
+.control label{display:flex;justify-content:space-between;gap:4px;font-size:12px;font-weight:650;margin-bottom:10px}
+.control .percent{color:var(--acid)}
+.control input[type=range]{width:100%}
+.control select{width:100%;padding:7px}
+.options{display:flex;align-items:center;flex-wrap:wrap;gap:17px;margin-top:15px}
+.options label{display:flex;align-items:center;gap:6px}
+.options input{height:18px;width:18px}
+.panel{background:#11161c;border:1px solid var(--edge);border-radius:9px;overflow:hidden;margin-bottom:14px}
+.panelheader{padding:12px 14px;border-bottom:1px solid var(--edge);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.panelheader strong{letter-spacing:.08em}
+.panel select{max-width:240px}
+canvas{width:100%;height:330px;display:block;touch-action:pan-y}
+.legend{display:flex;flex-wrap:wrap;gap:14px;color:var(--muted);padding:10px 14px;border-top:1px solid var(--edge);font-size:11px}
+.swatch{width:9px;height:9px;display:inline-block;margin-right:5px;border-radius:2px}
+.footer{padding:4px 0 10px;color:var(--muted);font-size:12px;line-height:1.8}
+.note{font-size:11px;color:var(--muted);margin-top:9px}
+@media(max-width:1020px){.statrow{grid-template-columns:repeat(3,1fr)}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){header{padding:13px 14px}header h1{font-size:17px}.badge{font-size:10px}.shell{display:block}aside{max-height:none;border-right:0;border-bottom:1px solid var(--edge);padding:11px 13px}#tracks{max-height:190px;overflow:auto}.line{margin:10px 0}main{padding:12px}.statrow{grid-template-columns:repeat(3,1fr)}.stat strong{font-size:17px}.stat small{font-size:9px}.controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.control{padding:8px}.presetrow button{padding:7px 9px;font-size:11px}canvas{height:290px}#time{margin-left:0}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>NINE INCH NAILS — REMIX LAB</h1><div class="caption">Multi-song MIDI player / electro-industrial sequencer / destructive glitch effects</div></div>
+  <div class="badge" id="status">ALL SONGS EMBEDDED · NO FETCH</div>
+</header>
+<div class="shell">
+  <aside>
+    <h2>SONG LIBRARY</h2>
+    <div class="hint" id="libraryCount"></div>
+    <select class="selectSong" id="song" aria-label="Select song"></select>
+    <div class="hint">Original fan-created MIDI arrangements, not original NIN audio or studio multitracks. Play and remix entirely within this page.</div>
+    <div class="line"></div>
+    <h2>TRACK MIXER</h2>
+    <div class="row">
+      <button id="all">All</button><button id="none">Mute</button>
+      <button id="onlyDrums">Drums</button><button id="onlyMelody">Melodic</button>
+    </div>
+    <div class="note">Enable a track with ✓. S = solo. ARP = arpeggiate that instrument. ▣ = show piano roll.</div>
+    <div id="tracks"></div>
+  </aside>
+  <main>
+    <div class="statrow">
+      <div class="stat"><strong id="tempo">—</strong><small>SONG BPM</small></div>
+      <div class="stat"><strong id="duration">—</strong><small>DURATION</small></div>
+      <div class="stat"><strong id="originalNotes">—</strong><small>ORIGINAL NOTES</small></div>
+      <div class="stat"><strong id="generatedNotes">—</strong><small>REMIX EVENTS</small></div>
+      <div class="stat"><strong id="trackCount">—</strong><small>TRACKS</small></div>
+    </div>
+    <section class="card">
+      <div class="transport">
+        <button class="primary" id="play" disabled>▶ Play</button><button id="stop">■ Stop</button>
+        <label>Speed <select id="speed" aria-label="Play speed"><option value=".5">½×</option><option value=".75">¾×</option><option value="1" selected>1×</option><option value="1.25">1¼×</option><option value="1.5">1½×</option></select></label>
+        <span id="time">0:00 / 0:00</span>
+      </div>
+      <input type="range" min="0" max="100" value="0" step=".1" id="seek" aria-label="Song position">
+    </section>
+    <section class="card">
+      <h2>REMIX PRESETS</h2>
+      <div class="presetrow">
+       <button data-preset="original">Original MIDI</button><button data-preset="machine">Industrial Machine</button><button data-preset="glitch">Glitch Damage</button><button data-preset="ebm">EBM Pulse</button><button data-preset="broken">Broken Beats</button><button data-preset="cold">Cold Electronics</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2>LIVE EFFECTS & SEQUENCER</h2>
+      <div class="controls">
+        <div class="control"><label for="glitch">GLITCH / STUTTER <span class="percent" id="glitchValue">0%</span></label><input type="range" id="glitch" min="0" max="100" step="1"></div>
+        <div class="control"><label for="gate">RHYTHMIC GATE <span class="percent" id="gateValue">0%</span></label><input type="range" id="gate" min="0" max="100" step="1"></div>
+        <div class="control"><label for="drive">DISTORTION <span class="percent" id="driveValue">0%</span></label><input type="range" id="drive" min="0" max="100" step="1"></div>
+        <div class="control"><label for="crush">BIT CRUSH <span class="percent" id="crushValue">0%</span></label><input type="range" id="crush" min="0" max="100" step="1"></div>
+        <div class="control"><label for="delay">TEMPO DELAY <span class="percent" id="delayValue">0%</span></label><input type="range" id="delay" min="0" max="100" step="1"></div>
+        <div class="control"><label for="filter">DARK FILTER <span class="percent" id="filterValue">0%</span></label><input type="range" id="filter" min="0" max="100" step="1"></div>
+        <div class="control"><label for="arp">ARPEGGIATOR RATE</label><select id="arp"><option value="off">Off</option><option value="8">1/8</option><option value="16">1/16</option><option value="32">1/32</option></select></div>
+        <div class="control"><label for="direction">ARP ORDER</label><select id="direction"><option value="up">Up</option><option value="down">Down</option><option value="updown">Up / Down</option><option value="random">Random</option></select></div>
+        <div class="control"><label>SEQUENCE ACTIONS</label><button id="reroll" title="Generate a different repeatable glitch arrangement">↻ Reseed stutters</button></div>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="kick"> Add 4/4 machine kick</label>
+        <label><input type="checkbox" id="sub"> Sub oscillator on bass</label>
+      </div>
+      <div class="note">Glitch, gate, and arpeggios rearrange MIDI events. Distortion, bit-depth reduction, filter, and delay operate on live synthesized audio. Changes take effect during playback.</div>
+    </section>
+    <section class="panel">
+      <div class="panelheader">
+        <strong>PIANO ROLL / REMIXED NOTES</strong>
+        <div class="row"><label>Track <select id="focus"></select></label><label>Window <select id="span"><option value="8">8 sec</option><option value="16" selected>16 sec</option><option value="32">32 sec</option></select></label></div>
+      </div>
+      <canvas id="roll" aria-label="Piano roll"></canvas>
+      <div class="legend">
+       <span><i class="swatch" style="background:#c8ed6a"></i>Original notes</span>
+       <span><i class="swatch" style="background:#8aeedb"></i>Arpeggios</span>
+       <span><i class="swatch" style="background:#ff87c5"></i>Glitch stutters</span>
+       <span><i class="swatch" style="background:#ffc37e"></i>Percussion</span>
+      </div>
+    </section>
+    <section class="card">
+      <div class="row">
+       <button id="save">Save patch</button><button id="load">Load patch</button><button class="primary" id="export">Export remixed MIDI</button>
+      </div>
+      <div class="note">Patch saves in this browser. MIDI export includes modified note sequences; audio processing is not embedded in standard MIDI files.</div>
+    </section>
+    <div class="footer">Standalone offline MIDI content and synth engine. No site login, streaming service, external sample library, or MIDI download requests. Arrangements credited to the <a href="https://github.com/ryohey/lakh-midi">Lakh MIDI collection</a>.</div>
+  </main>
+</div>
+<script id="embedded-library" type="application/json">__EMBEDDED_MIDI_LIBRARY__</script>
+<script>__INLINE_INFLATE_LIBRARY__</script>
+<script>__INLINE_REMIX_APP__</script>
+</body>
+</html>
