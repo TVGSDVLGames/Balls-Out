@@ -74,8 +74,10 @@ function parseMidi(data) {
  let unique=[];
  for(let t of tempos){if(unique.length&&unique[unique.length-1].t===t.t)unique[unique.length-1]=t;else unique.push(t);}
  function toSec(t){let sec=0,at=0,mpq=500000;for(const c of unique){if(c.t>t)break;sec+=(c.t-at)*mpq/division/1000000;at=c.t;mpq=c.v;}return sec+(t-at)*mpq/division/1000000;}
- const length=toSec(Math.max(1,...tracks.map(x=>x.endpoint)));
+ const fileEnd=toSec(Math.max(1,...tracks.map(x=>x.endpoint)));
  for(let tr of tracks)for(let n of tr.notes){n.at=toSec(n.tick);n.until=toSec(n.tick+n.len);}
+ const audibleEnd=tracks.reduce((total,tr)=>tr.notes.reduce((m,n)=>Math.max(m,n.until),total),0);
+ const length=Math.max(1,Math.min(fileEnd,audibleEnd+0.75));
  const bpm=60000000/(unique[unique.length-1].v||500000);
  return {tracks,length,bpm,format,sig,bytes:size,division,tempoMap:unique};
 }
@@ -255,10 +257,9 @@ function ensureAudio(){
  if(!C)throw Error('Web Audio unavailable');
  audio=new C();
  synthBus=audio.createGain();drumBus=audio.createGain();duck=audio.createGain();
- synthBus.connect(duck);duck.connect(audio.createGain());
- // Rebuild synth bus path directly to shared input:
+ synthBus.connect(duck);
  const input=audio.createGain();
- duck.disconnect();duck.connect(input);drumBus.connect(input);
+ duck.connect(input);drumBus.connect(input);
  clean=audio.createGain();dirty=audio.createGain();
  driveNode=audio.createWaveShaper();crushNode=audio.createWaveShaper();
  compressor=audio.createDynamicsCompressor();compressor.threshold.value=-21;compressor.ratio.value=5;compressor.attack.value=.005;compressor.release.value=.12;
@@ -416,7 +417,7 @@ function exportMidi(){
    out.push(0,255,3,name.length,...[...name].map(c=>c.charCodeAt(0)));
    let last=0;for(const e of raw){out.push(...varlen(e.tick-last),...e.data);last=e.tick;}
    out.push(0,255,47,0);
-   bytes.push(...chunk(out));
+   for(const byte of chunk(out))bytes.push(byte);
  }
  const blob=new Blob([new Uint8Array(bytes)],{type:'audio/midi'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
